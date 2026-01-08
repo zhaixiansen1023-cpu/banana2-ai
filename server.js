@@ -1,67 +1,53 @@
-import express from 'express';
-import cors from 'cors';
-import fetch from 'node-fetch';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 开启跨域和JSON解析
+// 启用静态文件服务，让用户能访问你的HTML
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '50mb' })); // 支持大图片传输
 app.use(cors());
-app.use(express.json());
-app.use(express.static('public')); // 托管静态网页
 
-// 核心画图接口
-app.post('/api/generate', async (req, res) => {
+// 核心转发逻辑
+app.post('/api/proxy', async (req, res) => {
     try {
-        const { model, prompt, size, n, response_format } = req.body;
-        const apiKey = process.env.AI_API_KEY;
-        const apiUrl = process.env.AI_API_URL || "https://api.tu-zi.com/v1/images/generations";
-
+        const apiKey = process.env.API_KEY; // 这里从环境变量取密码
         if (!apiKey) {
-            return res.status(500).json({ error: { message: "服务端未配置 API Key" } });
+            return res.status(500).json({ error: { message: "服务器未配置API Key" } });
         }
 
-        console.log(`[Server] 收到画图请求: ${prompt.slice(0, 20)}...`);
-
-        // 设置超长超时时间（5分钟），防止 AI 画太慢
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 300秒超时
-
-        const response = await fetch(apiUrl, {
+        const response = await fetch("https://api.tu-zi.com/v1/images/generations", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify({ model, prompt, size, n, response_format }),
-            signal: controller.signal
+            body: JSON.stringify(req.body)
         });
 
-        clearTimeout(timeoutId);
-
+        // 如果API返回错误（比如额度不够），直接把错误透传给前端
         if (!response.ok) {
-            const errText = await response.text();
-            console.error("[Server] API Error:", errText);
-            throw new Error(`上游 API 报错: ${errText}`);
+            const errData = await response.json();
+            return res.status(response.status).json(errData);
         }
 
         const data = await response.json();
         res.json(data);
 
     } catch (error) {
-        console.error("[Server] 处理失败:", error);
-        res.status(500).json({ error: { message: error.message || "服务器内部错误" } });
+        console.error("Proxy Error:", error);
+        res.status(500).json({ error: { message: "服务器内部转发错误" } });
     }
 });
 
-// 任何其他请求都返回网页
+// 任何其他请求都返回主页
 app.get('*', (req, res) => {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
