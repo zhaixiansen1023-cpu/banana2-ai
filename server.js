@@ -6,19 +6,23 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 启用静态文件服务，让用户能访问你的HTML
+// 1. 关键：开启静态文件服务，否则打不开网页
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '50mb' })); // 支持大图片传输
+
+// 2. 关键：允许 50mb 大小的图片传输，否则上传参考图会报错
+app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// 核心转发逻辑
+// 3. 核心接口：名字叫 /api/proxy
 app.post('/api/proxy', async (req, res) => {
     try {
-        const apiKey = process.env.API_KEY; // 这里从环境变量取密码
+        const apiKey = process.env.API_KEY; 
         if (!apiKey) {
-            return res.status(500).json({ error: { message: "服务器未配置API Key" } });
+            console.error("Missing API Key");
+            return res.status(500).json({ error: { message: "Server: API Key not configured" } });
         }
 
+        // 转发给兔子API
         const response = await fetch("https://api.tu-zi.com/v1/images/generations", {
             method: 'POST',
             headers: {
@@ -28,22 +32,18 @@ app.post('/api/proxy', async (req, res) => {
             body: JSON.stringify(req.body)
         });
 
-        // 如果API返回错误（比如额度不够），直接把错误透传给前端
-        if (!response.ok) {
-            const errData = await response.json();
-            return res.status(response.status).json(errData);
-        }
-
         const data = await response.json();
-        res.json(data);
+        
+        // 无论成功失败，都把上游的状态码透传回去
+        res.status(response.status).json(data);
 
     } catch (error) {
         console.error("Proxy Error:", error);
-        res.status(500).json({ error: { message: "服务器内部转发错误" } });
+        res.status(500).json({ error: { message: "Server internal proxy error" } });
     }
 });
 
-// 任何其他请求都返回主页
+// 4. 兜底路由：任何其他请求都返回网页
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
