@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Z先森.AI - Pro (Zeabur云端版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
+        
+        .btn-primary { 
+            background: linear-gradient(135deg, #DB4437 0%, #C5221F 100%); 
+            color: white; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(219, 68, 55, 0.3); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .input-field { transition: all 0.2s; border: 1px solid #e2e8f0; }
+        .input-field:focus { border-color: #DB4437; box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); }
+
+        .checkbox-custom {
+            appearance: none; background-color: #fff; margin: 0; font: inherit; color: currentColor; width: 1.15em; height: 1.15em; border: 1px solid #cbd5e1; border-radius: 0.25em; display: grid; place-content: center; transition: all 0.2s; cursor: pointer;
+        }
+        .checkbox-custom::before { content: ""; width: 0.65em; height: 0.65em; transform: scale(0); transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em white; transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
+        .checkbox-custom:checked { background-color: #DB4437; border-color: #DB4437; }
+        .checkbox-custom:checked::before { transform: scale(1); }
+
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        .thin-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .thin-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+        
+        .style-card { flex: 0 0 110px; height: 64px; border-radius: 12px; position: relative; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .style-card span { position: relative; z-index: 10; color: white; font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .style-card.active { border-color: #DB4437; transform: scale(0.98); }
+        .style-card.active::after { content: '✓'; position: absolute; top: 4px; right: 6px; color: white; font-size: 10px; font-weight: bold; }
+
+        .ref-thumb { flex: 0 0 70px; height: 70px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; overflow: hidden; position: relative; transition: all 0.2s; opacity: 0.6; filter: grayscale(50%); }
+        .ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .ref-thumb:hover { opacity: 0.8; }
+        .ref-thumb.selected { border-color: #DB4437; ring: 2px solid #fee2e2; transform: scale(0.95); opacity: 1; filter: grayscale(0%); }
+        
+        .ref-number { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.6); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: none; }
+        
+        .ref-thumb .del-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+        .ref-thumb:hover .del-btn { opacity: 1; }
+
+        .upload-zone { border: 2px dashed #e2e8f0; transition: all 0.2s; }
+        .upload-zone:hover { border-color: #DB4437; background: #fff1f2; }
+        
+        .selected-card { outline: 3px solid #DB4437; transform: scale(0.95); }
+        .check-circle { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: white; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .selected-card .check-circle { background: #DB4437; border-color: #DB4437; color: white; }
+
+        .quality-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+        .quality-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.2s; background: white; }
+        .quality-card:hover { border-color: #cbd5e1; }
+        .quality-card.active { border-color: #DB4437; background-color: #fef2f2; color: #b91c1c; }
+        .quality-name { display: block; font-weight: 800; font-size: 12px; margin-bottom: 2px; }
+        .quality-cost { font-size: 10px; color: #64748b; }
+        .quality-card.active .quality-cost { color: #b91c1c; font-weight: bold; }
+        
+        .credit-badge { 
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
+            color: #ffd700; 
+            padding: 6px 16px; 
+            border-radius: 20px; 
+            font-size: 13px; 
+            font-weight: bold; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden text-slate-700 bg-slate-50">
+
+    <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center p-4">
+        <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white text-4xl">&times;</button>
+        <img id="lightbox-img" class="max-w-full max-h-[85vh] rounded shadow-2xl object-contain">
+        <div class="flex gap-4 mt-6">
+            <button id="lightbox-download" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer">下载原图</button>
+            <button id="lightbox-del-btn" class="px-6 py-2 bg-red-600/20 text-red-500 border border-red-600/50 rounded-full font-bold text-sm hover:bg-red-600 hover:text-white transition">删除</button>
+        </div>
+    </div>
+
+    <div id="batch-bar" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-white shadow-2xl border border-gray-200 rounded-full px-6 py-3 flex items-center gap-6 hidden transform transition-all duration-300 translate-y-20">
+        <div class="text-sm font-bold text-gray-700">已选 <span id="select-count" class="text-red-600">0</span> 张</div>
+        <div class="h-4 w-[1px] bg-gray-300"></div>
+        <button onclick="deleteBatch()" class="text-red-500 font-bold text-sm hover:text-red-700 flex items-center gap-1"><span>🗑️</span> 批量删除</button>
+        <button onclick="toggleSelectMode()" class="text-gray-400 text-sm hover:text-gray-600 ml-2">取消</button>
+    </div>
+
+    <div id="auth-view" class="fixed inset-0 z-50 flex h-screen w-full bg-white">
+        <div class="hidden lg:flex w-1/2 bg-slate-900 relative overflow-hidden items-end">
+            <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?q=80&w=2070&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover opacity-60">
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+            <div class="relative z-10 p-16 text-white max-w-xl">
+                <h2 class="text-5xl font-black mb-6 leading-tight tracking-tight">Design with<br>Nano Banana Pro.</h2>
+                <p class="text-lg text-slate-300 font-light leading-relaxed">Google 最强建筑灵感引擎。<br>专为建筑师打造的高级工作台。</p>
+            </div>
+        </div>
+        <div class="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-white">
+            <div class="w-full max-w-md">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
+                    <p class="text-slate-400 text-sm mt-1">v6.0 Zeabur Edition</p>
+                </div>
+                <div class="space-y-5">
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" autocomplete="username" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" autocomplete="current-password" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="••••••••"></div>
+                    <div class="flex items-center justify-between mt-2">
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="remember-me" class="checkbox-custom" checked><span class="text-sm text-slate-500 font-medium select-none">记住我</span></label>
+                        <button onclick="forgotPassword()" class="text-sm font-bold text-red-600 hover:text-red-700 hover:underline">忘记密码?</button>
+                    </div>
+                    <button onclick="signIn()" class="w-full btn-primary py-4 rounded-xl font-bold text-lg shadow-lg mt-2">进入工作台</button>
+                    <div class="flex items-center justify-between mt-6"><div class="h-[1px] bg-slate-100 flex-1"></div><span class="text-xs text-slate-400 px-4">New here?</span><div class="h-[1px] bg-slate-100 flex-1"></div></div>
+                    <button onclick="signUp()" class="w-full py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition border border-transparent hover:border-slate-200">注册新账号 (送100积分)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-view" class="h-screen flex hidden">
+        <aside class="w-20 lg:w-64 bg-white border-r border-gray-200 flex flex-col justify-between z-20">
+            <div class="flex-1">
+                <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-100"><span class="font-black text-xl text-red-600 italic">Z先森</span></div>
+                <nav class="py-4 space-y-1">
+                    <button onclick="switchTab('create')" id="tab-create" class="w-full px-6 py-3 text-left hover:bg-red-50 text-red-600 bg-red-50 border-r-2 border-red-600">🎨 <span class="hidden lg:inline ml-2 font-bold">创作</span></button>
+                    <button onclick="switchTab('gallery')" id="tab-gallery" class="w-full px-6 py-3 text-left hover:bg-gray-50 text-gray-500">📂 <span class="hidden lg:inline ml-2 font-bold">我的画廊</span></button>
+                    <button onclick="switchTab('profile')" id="tab-profile" class="w-full px-6 py-3 text-left hover:bg-gray-50 text-gray-500">👤 <span class="hidden lg:inline ml-2 font-bold">个人中心</span></button>
+                </nav>
+            </div>
+            <div class="p-4 border-t"><button onclick="signOut()" class="text-xs text-slate-400 hover:text-slate-600">退出登录</button></div>
+        </aside>
+
+        <main class="flex-1 flex flex-col relative bg-slate-50">
+            <header id="main-header" class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-20">
+                <h1 class="text-sm font-bold text-gray-700">Banana Pro 创作中心</h1>
+                <div class="flex items-center gap-4">
+                   <div class="credit-badge">
+                       <span>💎</span> <span id="credit-display">--</span>
+                   </div>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.0</span>
+                </div>
+            </header>
+            
+            <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+                <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
+                    <div class="flex-1 overflow-y-auto p-6 space-y-5 thin-scrollbar">
+                        
+                        <div><label class="font-bold text-sm text-gray-700 flex justify-between mb-2"><span>风格滤镜</span><span id="style-name" class="text-xs text-red-600 font-bold">默认</span></label><div class="flex gap-3 overflow-x-auto thin-scrollbar pb-2 pt-1 px-1" id="style-container"></div></div>
+                        <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
+                        
+                        <div id="upload-section">
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(多图融合)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
+                            <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Google Vision 强力垫图</span></div></div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-bold text-gray-500">比例</label>
+                                <select id="aspect" class="w-full mt-1 p-2 border rounded-lg text-sm bg-white">
+                                    <option value="original">📐 按原图 (Auto)</option>
+                                    <option value="1:1">1:1 (正方)</option>
+                                    <option value="16:9">16:9 (横屏)</option>
+                                    <option value="3:4">3:4 (竖屏)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="text-xs font-bold text-gray-500">出图质量 & 积分</label>
+                            </div>
+                        </div>
+
+                        <div class="quality-grid">
+                            <div class="quality-card active" onclick="selectQuality('1k', 5, this)">
+                                <span class="quality-name">标准 (1k)</span>
+                                <span class="quality-cost">- 5 积分</span>
+                            </div>
+                            <div class="quality-card" onclick="selectQuality('2k', 10, this)">
+                                <span class="quality-name">高清 (2k)</span>
+                                <span class="quality-cost">- 10 积分</span>
+                            </div>
+                            <div class="quality-card" onclick="selectQuality('4k', 15, this)">
+                                <span class="quality-name">超清 (4k)</span>
+                                <span class="quality-cost">- 15 积分</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="p-6 border-t bg-white">
+                        <button onclick="generate()" id="btn-gen" class="w-full btn-primary py-3 rounded-xl font-bold shadow-lg">🚀 立即生成 (消耗 5 积分)</button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-gray-100 flex items-center justify-center p-4 relative"><div id="preview" class="bg-white rounded-lg shadow-sm p-2 max-w-full max-h-full overflow-auto flex items-center justify-center min-w-[300px] min-h-[300px]"><span class="text-gray-400">等待生成...</span></div></div>
+            </div>
+
+            <div id="view-gallery" class="hidden flex-1 overflow-y-auto p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-4"><h2 class="text-2xl font-bold">我的云端画廊</h2><button onclick="toggleSelectMode()" id="btn-batch-toggle" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold transition">⚡ 批量管理</button></div>
+                    <button onclick="loadGallery()" class="text-sm text-red-600 hover:underline">刷新</button>
+                </div>
+                <div id="gallery-grid" class="gallery-grid"></div>
+            </div>
+
+            <div id="view-profile" class="hidden flex-1 overflow-y-auto p-8 bg-slate-50">
+                <div class="max-w-2xl mx-auto space-y-6">
+                    <h2 class="text-2xl font-bold mb-6">个人中心</h2>
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-6">
+                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-2xl">👤</div>
+                        <div>
+                            <div class="text-sm text-gray-400 uppercase font-bold">当前账号</div>
+                            <div id="profile-email" class="text-xl font-bold text-gray-800">user@email.com</div>
+                            <div class="text-xs text-gray-400 mt-1">ID: <span id="profile-id">...</span></div>
+                            <div class="text-xs text-gray-400 mt-1">剩余积分: <span id="profile-credits-text" class="font-bold text-red-600">--</span></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🔐 安全设置</h3>
+                        <div class="space-y-4">
+                            <div><label class="text-xs font-bold text-gray-500">修改密码</label><input type="password" id="new-password" class="input-field w-full mt-1 p-3 rounded-lg text-sm bg-gray-50" placeholder="输入新密码 (至少6位)"></div>
+                            <button onclick="updatePassword()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-black transition">更新密码</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">💬 意见反馈</h3>
+                        <div class="space-y-3">
+                            <textarea id="feedback-content" rows="3" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="遇到 Bug 了？还是有什么新功能建议？"></textarea>
+                            <input type="text" id="feedback-contact" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="联系方式 (VX/Email，选填)">
+                            <button onclick="submitFeedback()" class="px-4 py-2 btn-primary rounded-lg text-sm shadow-md">提交反馈</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">清除本地缓存 (Settings)</span>
+                            <button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const SERVER_CONFIG = {
+            MODELS: {
+                '1k': 'gemini-3-pro-image-preview',
+                '2k': 'gemini-3-pro-image-preview-2k-vip',
+                '4k': 'gemini-3-pro-image-preview-4k-vip'
+            }
+        };
+
+        const SUPABASE_URL = 'https://sfkaeideyamxcidhsbih.supabase.co'; 
+        const SUPABASE_KEY = 'sb_publishable_KW1ss5pJQgl5iBHBAFvfYg_18EjeXGg'; 
+
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        let refImages = []; let selectedRefIds = new Set();
+        let isSelectMode = false; let selectedIds = new Set();
+        let currentLightboxId = null; let currentLightboxUrl = null; let currentLightboxPath = null;
+        let currentStylePrompt = ""; 
+        let abortController = null; 
+
+        let currentCredits = 0;
+        let selectedQuality = '1k'; // 默认1k
+        let currentCost = 5;       // 默认消耗
+
+        const styles = [
+            { name: "默认", color: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500", prompt: "" },
+            { name: "极简白", color: "bg-gradient-to-br from-white to-slate-200 text-slate-600 border border-slate-200", prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k" },
+            { name: "赛博朋克", color: "bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500", prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting" },
+            { name: "新中式", color: "bg-gradient-to-br from-stone-500 to-stone-700", prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic" },
+            { name: "扎哈流体", color: "bg-gradient-to-br from-blue-400 to-cyan-300", prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting" },
+            { name: "工业风", color: "bg-gradient-to-br from-gray-600 to-gray-900", prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows" },
+            { name: "森之屋", color: "bg-gradient-to-br from-emerald-400 to-green-600", prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves" }
+        ];
+
+        window.onload = async () => {
+            initCredits();
+            const { data: { session } } = await db.auth.getSession();
+            if (session) enterApp(session.user);
+            db.auth.onAuthStateChange((_, session) => session ? enterApp(session.user) : leaveApp());
+            renderStyles();
+        };
+
+        function initCredits() {
+            const saved = localStorage.getItem('user_credits');
+            if (saved === null) {
+                currentCredits = 100; 
+                localStorage.setItem('user_credits', 100);
+            } else {
+                currentCredits = parseInt(saved);
+            }
+            updateCreditUI();
+        }
+
+        function updateCreditUI() {
+            document.getElementById('credit-display').innerText = currentCredits;
+            document.getElementById('profile-credits-text').innerText = currentCredits;
+            const btn = document.getElementById('btn-gen');
+            if (!abortController) {
+                btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
+            }
+        }
+
+        function selectQuality(quality, cost, el) {
+            selectedQuality = quality;
+            currentCost = cost;
+            document.querySelectorAll('.quality-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            updateCreditUI();
+        }
+
+        async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送"); }
+        async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
+        async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
+        async function signOut() { await db.auth.signOut(); }
+        
+        function enterApp(user) { 
+            document.getElementById('auth-view').classList.add('hidden'); 
+            document.getElementById('app-view').classList.remove('hidden'); 
+            document.getElementById('profile-email').innerText = user.email;
+            document.getElementById('profile-id').innerText = user.id;
+            loadGallery(); 
+        }
+        function leaveApp() { document.getElementById('auth-view').classList.remove('hidden'); document.getElementById('app-view').classList.add('hidden'); }
+
+        async function updatePassword() { 
+            const newPw = document.getElementById('new-password').value; 
+            if(!newPw || newPw.length < 6) return alert("密码太短"); 
+            const { error } = await db.auth.updateUser({ password: newPw }); 
+            if(error) alert("更新失败: " + error.message); 
+            else { alert("密码已更新"); document.getElementById('new-password').value = ""; } 
+        }
+
+        async function submitFeedback() {
+            const content = document.getElementById('feedback-content').value;
+            const contact = document.getElementById('feedback-contact').value;
+            if(!content) return alert("请填写内容");
+            const { data: { user } } = await db.auth.getUser();
+            const { error } = await db.from('feedback').insert({ user_id: user.id, content, contact });
+            if(error) alert("提交失败: " + error.message); 
+            else { alert("感谢反馈！"); document.getElementById('feedback-content').value = ""; }
+        }
+
+        function clearKeys() { 
+            localStorage.removeItem('user_credits'); 
+            alert("本地缓存已清除"); 
+        }
+
+        function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
+        function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
+        
+        function handleImageUpload(input) { 
+            const files = Array.from(input.files); 
+            if (!files.length) return; 
+            if (refImages.length + files.length > 10) return alert("最多只能上传10张参考图！"); 
+            files.forEach(file => { 
+                const reader = new FileReader(); 
+                reader.onload = (e) => { 
+                    const id = Date.now() + Math.random(); 
+                    refImages.push({ id: id, base64: e.target.result }); 
+                    selectedRefIds.add(id); 
+                    renderRefTray(); 
+                }; 
+                reader.readAsDataURL(file); 
+            }); 
+            input.value = ''; 
+        }
+        
+        function renderRefTray() { 
+            const tray = document.getElementById('ref-tray'); 
+            const countLabel = document.getElementById('ref-count'); 
+            const placeholder = document.getElementById('upload-placeholder'); 
+            countLabel.innerText = `${refImages.length}/10`; 
+            if (refImages.length > 0) { 
+                tray.classList.remove('hidden'); 
+                placeholder.classList.add('h-12'); 
+                placeholder.querySelector('span').innerText = "继续添加 +"; 
+            } else { 
+                tray.classList.add('hidden'); 
+                placeholder.classList.remove('h-12'); 
+                placeholder.querySelector('span').innerText = "📤 拖拽或点击上传"; 
+            } 
+            tray.innerHTML = refImages.map((img, index) => `
+                <div class="ref-thumb ${selectedRefIds.has(img.id) ? 'selected' : ''}" onclick="toggleRef(${img.id})">
+                    <img src="${img.base64}">
+                    <div class="ref-number">${index + 1}</div>
+                    <div class="del-btn" onclick="event.stopPropagation(); removeRef(${img.id})">✕</div>
+                </div>
+            `).join(''); 
+        }
+        
+        function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
+        function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
+
+        function resetUI_Success() {
+            const btn = document.getElementById('btn-gen');
+            abortController = null;
+            updateCreditUI(); 
+            btn.onclick = generate;
+            btn.classList.remove('bg-gray-400', 'hover:bg-gray-500', 'text-white');
+            btn.classList.add('btn-primary');
+            btn.disabled = false;
+        }
+
+        function resetUI_AbortOrError(msg) {
+            resetUI_Success(); 
+            const preview = document.getElementById('preview');
+            const safeContent = DOMPurify.sanitize(`<span class="text-gray-400">${msg || '🚫 已中止生成'}</span>`);
+            preview.innerHTML = safeContent;
+        }
+
+        function handleUserStop() {
+            if (abortController) {
+                abortController.abort(); 
+            }
+        }
+
+        async function downloadImage(url) {
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `z_ai_${Date.now()}.png`; 
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.error('Download failed:', e);
+                window.open(url, '_blank'); 
+            }
+        }
+
+        function base64ToBlob(base64, mimeType) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+
+        // --- 🚀 核心生成函数 (Zeabur 后端代理版) ---
+        async function generate() {
+            const btn = document.getElementById('btn-gen');
+            const preview = document.getElementById('preview');
+            
+            if (currentCredits < currentCost) {
+                alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
+                return;
+            }
+
+            currentCredits -= currentCost;
+            localStorage.setItem('user_credits', currentCredits);
+            updateCreditUI(); 
+
+            abortController = new AbortController();
+            const signal = abortController.signal;
+
+            btn.innerText = "🛑 停止生成 (积分已预扣)";
+            btn.disabled = true; 
+            
+            let userPrompt = document.getElementById('prompt').value; 
+            const aspectStr = document.getElementById('aspect').value; 
+            const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
+            
+            const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
+            let tempUploadPaths = []; 
+
+            try {
+                let finalPrompt = userPrompt;
+                let refImageUrls = []; 
+                let sizeParam = "1024x1024"; 
+
+                // 1. 处理参考图（前端直接上传Supabase，不经过后端）
+                if (selectedImages.length > 0) {
+                    preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传参考图...</span>`;
+                    const { data: { user } } = await db.auth.getUser();
+                    const userId = user ? user.id : 'anon';
+
+                    await Promise.all(selectedImages.map(async (img, index) => {
+                        try {
+                            const base64Data = img.base64.split(',')[1];
+                            const blob = base64ToBlob(base64Data, 'image/png');
+                            const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
+                            await db.storage.from('ai-images').upload(tempName, blob);
+                            tempUploadPaths.push(tempName); 
+                            const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
+                            refImageUrls.push(publicUrl);
+                        } catch (e) { console.warn(e); }
+                    }));
+                    
+                    if (aspectStr === "16:9") sizeParam = "1792x1024";
+                    else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                } else {
+                     if (aspectStr === "16:9") sizeParam = "1792x1024";
+                     else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                }
+
+                // 2. 构造 Prompt
+                preview.innerHTML = '<span class="animate-pulse text-red-600">正在云端生成...</span>';
+                if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
+                if (refImageUrls.length > 0) {
+                    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                    refImageUrls.forEach((url, i) => { finalPrompt += ` (Ref: ${url})`; });
+                }
+
+                const payload = { 
+                    model: painterModelId, 
+                    prompt: finalPrompt, 
+                    size: sizeParam, 
+                    n: 1,
+                    response_format: "b64_json" 
+                };
+
+                // 3. 请求本地后端 /api/generate (由 Server.js 代理转发)
+                const paintRes = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: signal 
+                });
+                
+                if (!paintRes.ok) {
+                    const errData = await paintRes.json();
+                    throw new Error(errData.error?.message || "服务器错误");
+                }
+                
+                const paintData = await paintRes.json();
+                
+                // 4. 前端接收结果 + 上传 Supabase
+                const b64Data = paintData.data?.[0]?.b64_json;
+                const urlData = paintData.data?.[0]?.url;
+
+                if (!b64Data && !urlData) throw new Error("API 未返回有效图片数据");
+                preview.innerHTML = '<span class="animate-pulse text-green-600">正在保存...</span>';
+
+                const { data: { user } } = await db.auth.getUser();
+                let imgBlob = b64Data ? base64ToBlob(b64Data, 'image/png') : await (await fetch(urlData)).blob();
+                
+                const fileName = `${user.id}/${Date.now()}.png`;
+                await db.storage.from('ai-images').upload(fileName, imgBlob, { contentType: 'image/png', upsert: true });
+                const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(fileName);
+                
+                await db.from('images').insert({ 
+                    user_id: user.id, prompt: userPrompt, image_url: publicUrl, 
+                    file_path: fileName, engine: 'zeabur-pro-v6.0', seed: 0 
+                });
+                
+                preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
+                loadGallery();
+                resetUI_Success();
+
+            } catch (e) {
+                console.error(e);
+                refundCredits(); 
+                alert("生成失败: " + e.message);
+                resetUI_Success();
+            } finally {
+                if (tempUploadPaths.length > 0) db.storage.from('ai-images').remove(tempUploadPaths);
+            }
+        }
+
+        async function loadGallery() { 
+            const { data: { user } } = await db.auth.getUser();
+            if (!user) return; 
+            const { data } = await db.from('images').select('*').eq('user_id', user.id).order('created_at', { ascending: false }); 
+            if(data) { renderGalleryGrid(data); selectedIds.clear(); updateBatchUI(); } 
+        }
+        
+        function renderGalleryGrid(data) { 
+            document.getElementById('gallery-grid').innerHTML = data.map(img => {
+                const safePath = img.file_path || ''; 
+                return `
+                <div id="card-${img.id}" class="bg-white rounded overflow-hidden shadow group relative border border-gray-100 cursor-pointer transition-all" onclick="handleCardClick(${img.id}, '${img.image_url}', '${safePath}')">
+                    <div class="aspect-square relative">
+                        <img src="${img.image_url}" class="w-full h-full object-cover">
+                        <div class="normal-overlay absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100 ${isSelectMode ? 'hidden' : ''}">
+                            <span class="text-white bg-black/50 px-3 py-1 rounded-full text-xs">👀 查看</span>
+                        </div>
+                        <div class="batch-overlay check-circle ${isSelectMode ? '' : 'hidden'}"></div>
+                    </div>
+                    <div class="p-2 flex justify-between items-center bg-gray-50">
+                        <span class="text-[10px] text-gray-500 truncate w-20">${img.prompt}</span>
+                        <div class="flex gap-2">
+                            <span class="text-[9px] uppercase font-bold text-red-500">Pro</span>
+                            <button onclick="event.stopPropagation(); deleteSingle(${img.id}, '${safePath}', '${img.image_url}')" class="text-gray-400 hover:text-red-500 ${isSelectMode ? 'hidden' : ''}" title="删除">🗑️</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join(''); 
+        }
+
+        function handleCardClick(id, url, filePath) { 
+            if (isSelectMode) { 
+                if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
+                const card = document.getElementById(`card-${id}`), circle = card.querySelector('.check-circle'); 
+                if (selectedIds.has(id)) { card.classList.add('selected-card'); circle.innerText = '✓'; } 
+                else { card.classList.remove('selected-card'); circle.innerText = ''; } 
+                updateBatchUI(); 
+            } else { 
+                openLightbox(url, id, filePath); 
+            } 
+        }
+
+        function toggleSelectMode() { isSelectMode = !isSelectMode; const btn = document.getElementById('btn-batch-toggle'), bar = document.getElementById('batch-bar'); if (isSelectMode) { btn.classList.replace('bg-gray-100', 'bg-red-50'); btn.classList.replace('text-gray-600', 'text-red-600'); bar.classList.remove('hidden', 'translate-y-20'); } else { btn.classList.replace('bg-red-50', 'bg-gray-100'); btn.classList.replace('text-red-600', 'text-gray-600'); bar.classList.add('translate-y-20'); selectedIds.clear(); } loadGallery(); }
+        function updateBatchUI() { document.getElementById('select-count').innerText = selectedIds.size; }
+
+        async function performDeletion(id, filePath, url) { 
+            try { 
+                let path = filePath;
+                if (!path && url) { path = decodeURIComponent(url.split('/ai-images/')[1]); }
+                if (path) { await db.storage.from('ai-images').remove([path]); }
+            } catch (e) { console.warn("File delete error:", e); } 
+            
+            const { error } = await db.from('images').delete().eq('id', id); 
+            if(error) throw error; 
+        }
+
+        async function deleteSingle(id, filePath, url) { 
+            if (!confirm("确定删除？")) return; 
+            const el = document.getElementById(`card-${id}`); 
+            if (el) el.style.opacity = '0.3'; 
+            try { 
+                await performDeletion(id, filePath, url); 
+                if(el) el.remove(); 
+            } catch(e) { 
+                alert("删除失败"); 
+                if(el) el.style.opacity='1'; 
+            } 
+        }
+
+        async function deleteBatch() { 
+            if (selectedIds.size === 0) return; 
+            if (!confirm(`确定删除 ${selectedIds.size} 张图片？`)) return; 
+            const idsArray = Array.from(selectedIds); 
+            const { data: files } = await db.from('images').select('file_path').in('id', idsArray); 
+            const paths = files.map(f => f.file_path).filter(p => p); 
+            if(paths.length) await db.storage.from('ai-images').remove(paths); 
+            const {error} = await db.from('images').delete().in('id', idsArray); 
+            if(error) return alert("删除失败"); 
+            idsArray.forEach(id=>{const el=document.getElementById(`card-${id}`);if(el)el.remove()}); 
+            toggleSelectMode(); 
+        }
+
+        function openLightbox(url, id, filePath) { 
+            currentLightboxId = id; 
+            currentLightboxUrl = url; 
+            currentLightboxPath = filePath;
+            document.getElementById('lightbox-img').src = url; 
+            const dlBtn = document.getElementById('lightbox-download');
+            dlBtn.onclick = () => downloadImage(url);
+            document.getElementById('lightbox').classList.remove('hidden'); 
+            document.getElementById('lightbox-del-btn').onclick = deleteCurrentInLightbox; 
+        }
+
+        function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+        async function deleteCurrentInLightbox() { if(currentLightboxId) { if(!confirm("确定删除？")) return; try { await performDeletion(currentLightboxId, currentLightboxPath, currentLightboxUrl); closeLightbox(); loadGallery(); } catch(e) { alert(e.message); } } }
+        
+        function switchTab(tab) { 
+            document.getElementById('view-create').classList.add('hidden'); 
+            document.getElementById('view-gallery').classList.add('hidden'); 
+            document.getElementById('view-profile').classList.add('hidden'); 
+            document.getElementById('tab-create').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            document.getElementById('tab-gallery').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            document.getElementById('tab-profile').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            document.getElementById('view-' + tab).classList.remove('hidden');
+            document.getElementById('tab-' + tab).classList.add('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            if(tab === 'profile') document.getElementById('main-header').classList.add('hidden');
+            else document.getElementById('main-header').classList.remove('hidden');
+            if(tab === 'gallery') loadGallery();
+        }
+    </script>
+</body>
+</html>
