@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (加密安全版)</title>
+    <title>Z先森.AI - Pro (全功能加密版)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
@@ -257,12 +257,10 @@
 
     <script>
         // --- ⚙️ 核心配置区域 ---
-        // 注意：Key 已移除，现在由 Zeabur 后端环境变量 (API_KEY) 管理，这里留空即可
-        const MY_HIDDEN_KEY = ""; 
+        const MY_HIDDEN_KEY = ""; // 加密版：Key 由服务器管理，此处留空
 
         const SERVER_CONFIG = {
-            // 注意：这里不用填 URL，因为我们配置了 server.js 代理，默认用相对路径
-            BASE_URL: "", 
+            BASE_URL: "", // 走本地代理，留空即可
             MODELS: {
                 '1k': 'gemini-3-pro-image-preview',
                 '2k': 'gemini-3-pro-image-preview-2k-vip',
@@ -371,7 +369,7 @@
 
         function clearKeys() { 
             localStorage.removeItem('gg_key'); 
-            alert("本地缓存已清除"); 
+            alert("本地缓存已清除 (注: V4版本使用内置 Key，此操作仅清除旧缓存)"); 
         }
 
 
@@ -475,7 +473,7 @@
             return new Blob([byteArray], { type: mimeType });
         }
 
-        // --- 🚀 核心生成函数（V4.4 加密版：通过 Node 中转） ---
+        // --- 🚀 核心生成函数（V4.3 加密适配版） ---
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
@@ -501,8 +499,7 @@
 
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
-            
-            // 注意：Key 变量已删除，不再前端处理
+            // Key 已移除，由 Server 端处理
             
             const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
             
@@ -581,10 +578,10 @@
                     response_format: "b64_json" 
                 };
 
-                // 5. 发起请求 (加密核心修改点：发给本地 /api/proxy)
+                // 5. 发起请求 - 核心修改点：发往本地 Proxy
                 const paintRes = await fetch('/api/proxy', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, // 不需要 Auth Header 了
+                    headers: { 'Content-Type': 'application/json' }, // 不需要 Authorization
                     body: JSON.stringify(paintPayload),
                     signal: signal 
                 });
@@ -610,6 +607,7 @@
                     if (b64Data) {
                         imgBlob = base64ToBlob(b64Data, 'image/png');
                     } else {
+                        // 保底逻辑
                         const imgRes = await fetch(urlData);
                         imgBlob = await imgRes.blob();
                     }
@@ -637,6 +635,7 @@
                     
                 } catch (err) {
                     console.warn("转存失败:", err);
+                    // 即使云端失败，如果是 Base64，本地依然可以展示出来，不算完全失败
                     const fallbackSrc = b64Data ? `data:image/png;base64,${b64Data}` : urlData;
                     preview.innerHTML = `<img src="${fallbackSrc}" class="rounded shadow-lg max-h-[70vh]"><div class="text-xs text-center mt-2 text-red-500 font-bold">⚠️ 云存储失败 (${err.message})，请立即右键保存图片！</div>`;
                 }
@@ -651,7 +650,7 @@
                     resetUI_AbortOrError('🚫 已中止生成 (积分已退回)');
                 } else {
                     let msg = e.message;
-                    if (msg.includes("Failed to fetch")) msg = "网络连接失败";
+                    if (msg.includes("Failed to fetch")) msg = "网络连接失败 (请检查服务器是否运行)";
                     resetUI_AbortOrError(`❌ 生成失败<br><span class="text-xs">${msg}</span><br><span class="text-xs text-green-600 font-bold">积分已退回</span>`);
                 }
             } finally {
