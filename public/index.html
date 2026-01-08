@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (Zeabur云端版)</title>
+    <title>Z先森.AI - Pro (加密安全版)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
@@ -110,7 +110,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.0 Zeabur Edition</p>
+                    <p class="text-slate-400 text-sm mt-1">v4.3 Secure Edition</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" autocomplete="username" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -147,7 +147,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.0</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V4.3</span>
                 </div>
             </header>
             
@@ -159,9 +159,9 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(多图融合)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(强制垫图 - v3.7内核)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
-                            <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Google Vision 强力垫图</span></div></div>
+                            <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
                         
                         <div class="grid grid-cols-2 gap-3">
@@ -244,7 +244,7 @@
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">清除本地缓存 (Settings)</span>
+                            <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span>
                             <button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
                         </div>
                     </div>
@@ -256,7 +256,13 @@
     </div>
 
     <script>
+        // --- ⚙️ 核心配置区域 ---
+        // 注意：Key 已移除，现在由 Zeabur 后端环境变量 (API_KEY) 管理，这里留空即可
+        const MY_HIDDEN_KEY = ""; 
+
         const SERVER_CONFIG = {
+            // 注意：这里不用填 URL，因为我们配置了 server.js 代理，默认用相对路径
+            BASE_URL: "", 
             MODELS: {
                 '1k': 'gemini-3-pro-image-preview',
                 '2k': 'gemini-3-pro-image-preview-2k-vip',
@@ -276,6 +282,7 @@
         let currentStylePrompt = ""; 
         let abortController = null; 
 
+        // 积分系统变量
         let currentCredits = 0;
         let selectedQuality = '1k'; // 默认1k
         let currentCost = 5;       // 默认消耗
@@ -298,6 +305,7 @@
             renderStyles();
         };
 
+        // --- 💰 积分系统 ---
         function initCredits() {
             const saved = localStorage.getItem('user_credits');
             if (saved === null) {
@@ -326,6 +334,7 @@
             updateCreditUI();
         }
 
+        // --- 身份验证 ---
         async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送"); }
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
@@ -335,11 +344,12 @@
             document.getElementById('auth-view').classList.add('hidden'); 
             document.getElementById('app-view').classList.remove('hidden'); 
             document.getElementById('profile-email').innerText = user.email;
-            document.getElementById('profile-id').innerText = user.id;
+            document.getElementById('profile-id').innerText = user.id; // 恢复 ID 显示
             loadGallery(); 
         }
         function leaveApp() { document.getElementById('auth-view').classList.remove('hidden'); document.getElementById('app-view').classList.add('hidden'); }
 
+        // --- 🆕 恢复的个人中心功能逻辑 ---
         async function updatePassword() { 
             const newPw = document.getElementById('new-password').value; 
             if(!newPw || newPw.length < 6) return alert("密码太短"); 
@@ -353,19 +363,23 @@
             const contact = document.getElementById('feedback-contact').value;
             if(!content) return alert("请填写内容");
             const { data: { user } } = await db.auth.getUser();
+            // 注意：这需要 Supabase 里有 'feedback' 表
             const { error } = await db.from('feedback').insert({ user_id: user.id, content, contact });
-            if(error) alert("提交失败: " + error.message); 
+            if(error) alert("提交失败 (请检查数据库是否有 feedback 表): " + error.message); 
             else { alert("感谢反馈！"); document.getElementById('feedback-content').value = ""; }
         }
 
         function clearKeys() { 
-            localStorage.removeItem('user_credits'); 
+            localStorage.removeItem('gg_key'); 
             alert("本地缓存已清除"); 
         }
 
+
+        // --- UI 逻辑 ---
         function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
         function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
         
+        // --- 垫图逻辑优化 ---
         function handleImageUpload(input) { 
             const files = Array.from(input.files); 
             if (!files.length) return; 
@@ -450,6 +464,7 @@
             }
         }
 
+        // --- 🛠️ 辅助工具函数：Base64 转 Blob ---
         function base64ToBlob(base64, mimeType) {
             const byteCharacters = atob(base64);
             const byteNumbers = new Array(byteCharacters.length);
@@ -460,16 +475,18 @@
             return new Blob([byteArray], { type: mimeType });
         }
 
-        // --- 🚀 核心生成函数 (Zeabur 后端代理版) ---
+        // --- 🚀 核心生成函数（V4.4 加密版：通过 Node 中转） ---
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
             
+            // 1. 积分预检
             if (currentCredits < currentCost) {
                 alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
                 return;
             }
 
+            // 2. 扣费与状态锁定
             currentCredits -= currentCost;
             localStorage.setItem('user_credits', currentCredits);
             updateCreditUI(); 
@@ -478,10 +495,15 @@
             const signal = abortController.signal;
 
             btn.innerText = "🛑 停止生成 (积分已预扣)";
-            btn.disabled = true; 
-            
+            btn.classList.remove('btn-primary');
+            btn.classList.add('bg-gray-400', 'hover:bg-gray-500', 'text-white');
+            btn.onclick = handleUserStop; 
+
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
+            
+            // 注意：Key 变量已删除，不再前端处理
+            
             const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
             
             const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
@@ -492,9 +514,11 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // 1. 处理参考图（前端直接上传Supabase，不经过后端）
+                // 3. 处理参考图（保持 v3.7 逻辑）
                 if (selectedImages.length > 0) {
-                    preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传参考图...</span>`;
+                    
+                    preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
+                    
                     const { data: { user } } = await db.auth.getUser();
                     const userId = user ? user.id : 'anon';
 
@@ -502,30 +526,54 @@
                         try {
                             const base64Data = img.base64.split(',')[1];
                             const blob = base64ToBlob(base64Data, 'image/png');
+                            
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
+                            
                             await db.storage.from('ai-images').upload(tempName, blob);
                             tempUploadPaths.push(tempName); 
+                            
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
-                        } catch (e) { console.warn(e); }
+                        } catch (e) {
+                            console.warn(`第 ${index+1} 张图上传失败:`, e);
+                        }
                     }));
                     
+                    // 智能比例检测
+                    if (aspectStr === "original") {
+                        try {
+                            const img = new Image();
+                            img.src = selectedImages[0].base64;
+                            await new Promise(r => img.onload = r);
+                            const ratio = img.width / img.height;
+                            if (ratio > 1.2) { sizeParam = "1792x1024"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 横图模式</div>'; }
+                            else if (ratio < 0.8) { sizeParam = "1024x1792"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 竖图模式</div>'; }
+                            else { sizeParam = "1024x1024"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 方图模式</div>'; }
+                        } catch(e){ sizeParam = "1024x1024"; }
+                    } else {
+                        if (aspectStr === "16:9") sizeParam = "1792x1024";
+                        else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                        else sizeParam = "1024x1024";
+                    }
+                } else {
                     if (aspectStr === "16:9") sizeParam = "1792x1024";
                     else if (aspectStr === "3:4") sizeParam = "1024x1792";
-                } else {
-                     if (aspectStr === "16:9") sizeParam = "1792x1024";
-                     else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                    else sizeParam = "1024x1024";
                 }
 
-                // 2. 构造 Prompt
-                preview.innerHTML = '<span class="animate-pulse text-red-600">正在云端生成...</span>';
+                // 4. 构建 Payload
+                preview.innerHTML = '<span class="animate-pulse text-red-600">正在极速渲染中...</span>';
+                
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
+                if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
+                if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
+
                 if (refImageUrls.length > 0) {
                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                    refImageUrls.forEach((url, i) => { finalPrompt += ` (Ref: ${url})`; });
+                    refImageUrls.forEach((url, i) => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
-                const payload = { 
+                const paintPayload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: sizeParam, 
@@ -533,52 +581,94 @@
                     response_format: "b64_json" 
                 };
 
-                // 3. 请求本地后端 /api/generate (由 Server.js 代理转发)
-                const paintRes = await fetch('/api/generate', {
+                // 5. 发起请求 (加密核心修改点：发给本地 /api/proxy)
+                const paintRes = await fetch('/api/proxy', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'application/json' }, // 不需要 Auth Header 了
+                    body: JSON.stringify(paintPayload),
                     signal: signal 
                 });
                 
-                if (!paintRes.ok) {
-                    const errData = await paintRes.json();
-                    throw new Error(errData.error?.message || "服务器错误");
-                }
-                
+                if (paintRes.status === 429) throw new Error("API 额度不足 (429)。");
                 const paintData = await paintRes.json();
                 
-                // 4. 前端接收结果 + 上传 Supabase
+                if(paintData.error) throw new Error(paintData.error.message);
+                
+                // 6. 结果处理（解析 Base64）
                 const b64Data = paintData.data?.[0]?.b64_json;
                 const urlData = paintData.data?.[0]?.url;
 
                 if (!b64Data && !urlData) throw new Error("API 未返回有效图片数据");
+
                 preview.innerHTML = '<span class="animate-pulse text-green-600">正在保存...</span>';
 
-                const { data: { user } } = await db.auth.getUser();
-                let imgBlob = b64Data ? base64ToBlob(b64Data, 'image/png') : await (await fetch(urlData)).blob();
-                
-                const fileName = `${user.id}/${Date.now()}.png`;
-                await db.storage.from('ai-images').upload(fileName, imgBlob, { contentType: 'image/png', upsert: true });
-                const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(fileName);
-                
-                await db.from('images').insert({ 
-                    user_id: user.id, prompt: userPrompt, image_url: publicUrl, 
-                    file_path: fileName, engine: 'zeabur-pro-v6.0', seed: 0 
-                });
-                
-                preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
-                loadGallery();
-                resetUI_Success();
+                try {
+                    const { data: { user } } = await db.auth.getUser();
+                    let imgBlob;
+
+                    // 分支处理：优先 Base64 转 Blob
+                    if (b64Data) {
+                        imgBlob = base64ToBlob(b64Data, 'image/png');
+                    } else {
+                        const imgRes = await fetch(urlData);
+                        imgBlob = await imgRes.blob();
+                    }
+                    
+                    const fileName = `${user.id}/${Date.now()}.png`;
+                    
+                    // 上传到 Supabase
+                    const { error: uploadErr } = await db.storage.from('ai-images').upload(fileName, imgBlob, { 
+                        contentType: 'image/png',
+                        upsert: true 
+                    });
+                    
+                    if (uploadErr) throw uploadErr;
+
+                    const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(fileName);
+                    
+                    // 写入数据库记录
+                    await db.from('images').insert({ 
+                        user_id: user.id, prompt: userPrompt, image_url: publicUrl, 
+                        file_path: fileName, engine: 'banana-pro-v4.3', seed: 0 
+                    });
+                    
+                    preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
+                    loadGallery(); 
+                    
+                } catch (err) {
+                    console.warn("转存失败:", err);
+                    const fallbackSrc = b64Data ? `data:image/png;base64,${b64Data}` : urlData;
+                    preview.innerHTML = `<img src="${fallbackSrc}" class="rounded shadow-lg max-h-[70vh]"><div class="text-xs text-center mt-2 text-red-500 font-bold">⚠️ 云存储失败 (${err.message})，请立即右键保存图片！</div>`;
+                }
+
+                resetUI_Success(); 
 
             } catch (e) {
                 console.error(e);
                 refundCredits(); 
-                alert("生成失败: " + e.message);
-                resetUI_Success();
+                
+                if (e.name === 'AbortError') { 
+                    resetUI_AbortOrError('🚫 已中止生成 (积分已退回)');
+                } else {
+                    let msg = e.message;
+                    if (msg.includes("Failed to fetch")) msg = "网络连接失败";
+                    resetUI_AbortOrError(`❌ 生成失败<br><span class="text-xs">${msg}</span><br><span class="text-xs text-green-600 font-bold">积分已退回</span>`);
+                }
             } finally {
-                if (tempUploadPaths.length > 0) db.storage.from('ai-images').remove(tempUploadPaths);
+                // 7. 清理 Temp (v3.7 逻辑)
+                if (tempUploadPaths.length > 0) {
+                    db.storage.from('ai-images').remove(tempUploadPaths).then(({ error }) => {
+                        if (error) console.warn("临时文件清理失败:", error);
+                    });
+                }
             }
+        }
+
+        // --- 辅助功能 ---
+        function refundCredits() {
+            currentCredits += currentCost;
+            localStorage.setItem('user_credits', currentCredits);
+            updateCreditUI();
         }
 
         async function loadGallery() { 
