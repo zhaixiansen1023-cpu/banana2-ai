@@ -3,15 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V5.0 Enterprise)</title>
+    <title>Z先森.AI - Pro (V5.2 Enterprise Full)</title>
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        /* --- 全局样式定义 (完美复刻 V4.4) --- */
-        body { background-color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
+        /* =========================================
+           2. 全局样式定义 (V4.4 原版复刻)
+           ========================================= */
+        body { 
+            background-color: #f8fafc; 
+            font-family: 'Inter', system-ui, sans-serif; 
+            color: #334155; 
+        }
         
         /* 按钮特效 */
         .btn-primary { 
@@ -19,30 +26,70 @@
             color: white; 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(219, 68, 55, 0.3); }
-        .btn-primary:active { transform: translateY(0); }
-        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-primary:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 20px rgba(219, 68, 55, 0.3); 
+        }
+        .btn-primary:active { 
+            transform: translateY(0); 
+        }
+        .btn-primary:disabled { 
+            background: #cbd5e1; 
+            cursor: not-allowed; 
+            transform: none; 
+            box-shadow: none; 
+        }
 
         /* 输入框交互 */
-        .input-field { transition: all 0.2s; border: 1px solid #e2e8f0; }
-        .input-field:focus { border-color: #DB4437; box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); }
+        .input-field { 
+            transition: all 0.2s; 
+            border: 1px solid #e2e8f0; 
+        }
+        .input-field:focus { 
+            border-color: #DB4437; 
+            box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); 
+        }
 
         /* 自定义 Checkbox */
         .checkbox-custom {
-            appearance: none; background-color: #fff; margin: 0; font: inherit; color: currentColor; 
-            width: 1.15em; height: 1.15em; border: 1px solid #cbd5e1; border-radius: 0.25em; 
-            display: grid; place-content: center; transition: all 0.2s; cursor: pointer;
+            appearance: none; 
+            background-color: #fff; 
+            margin: 0; 
+            font: inherit; 
+            color: currentColor; 
+            width: 1.15em; 
+            height: 1.15em; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 0.25em; 
+            display: grid; 
+            place-content: center; 
+            transition: all 0.2s; 
+            cursor: pointer;
         }
         .checkbox-custom::before { 
-            content: ""; width: 0.65em; height: 0.65em; transform: scale(0); 
-            transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em white; 
-            transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); 
+            content: ""; 
+            width: 0.65em; 
+            height: 0.65em; 
+            transform: scale(0); 
+            transition: 120ms transform ease-in-out; 
+            box-shadow: inset 1em 1em white; 
+            transform-origin: center; 
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); 
         }
-        .checkbox-custom:checked { background-color: #DB4437; border-color: #DB4437; }
-        .checkbox-custom:checked::before { transform: scale(1); }
+        .checkbox-custom:checked { 
+            background-color: #DB4437; 
+            border-color: #DB4437; 
+        }
+        .checkbox-custom:checked::before { 
+            transform: scale(1); 
+        }
 
-        /* 画廊网格 */
-        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        /* 画廊网格布局 */
+        .gallery-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 1rem; 
+        }
         
         /* 滚动条美化 */
         .thin-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
@@ -51,26 +98,78 @@
         
         /* 风格卡片 */
         .style-card { 
-            flex: 0 0 110px; height: 64px; border-radius: 12px; position: relative; cursor: pointer; 
-            border: 2px solid transparent; transition: all 0.2s; overflow: hidden; 
-            display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+            flex: 0 0 110px; 
+            height: 64px; 
+            border-radius: 12px; 
+            position: relative; 
+            cursor: pointer; 
+            border: 2px solid transparent; 
+            transition: all 0.2s; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
         }
-        .style-card span { position: relative; z-index: 10; color: white; font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-        .style-card.active { border-color: #DB4437; transform: scale(0.98); }
-        .style-card.active::after { content: '✓'; position: absolute; top: 4px; right: 6px; color: white; font-size: 10px; font-weight: bold; }
+        .style-card span { 
+            position: relative; 
+            z-index: 10; 
+            color: white; 
+            font-size: 12px; 
+            font-weight: 800; 
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3); 
+        }
+        .style-card.active { 
+            border-color: #DB4437; 
+            transform: scale(0.98); 
+        }
+        .style-card.active::after { 
+            content: '✓'; 
+            position: absolute; 
+            top: 4px; 
+            right: 6px; 
+            color: white; 
+            font-size: 10px; 
+            font-weight: bold; 
+        }
 
         /* 参考图缩略图 */
         .ref-thumb { 
-            flex: 0 0 70px; height: 70px; border-radius: 8px; border: 2px solid transparent; 
-            cursor: pointer; overflow: hidden; position: relative; transition: all 0.2s; 
-            opacity: 0.6; filter: grayscale(50%); 
+            flex: 0 0 70px; 
+            height: 70px; 
+            border-radius: 8px; 
+            border: 2px solid transparent; 
+            cursor: pointer; 
+            overflow: hidden; 
+            position: relative; 
+            transition: all 0.2s; 
+            opacity: 0.6; 
+            filter: grayscale(50%); 
         }
         .ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .ref-thumb:hover { opacity: 0.8; }
-        .ref-thumb.selected { border-color: #DB4437; ring: 2px solid #fee2e2; transform: scale(0.95); opacity: 1; filter: grayscale(0%); }
+        .ref-thumb.selected { 
+            border-color: #DB4437; 
+            ring: 2px solid #fee2e2; 
+            transform: scale(0.95); 
+            opacity: 1; 
+            filter: grayscale(0%); 
+        }
         
-        .ref-number { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.6); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: none; }
-        .ref-thumb .del-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+        .ref-number { 
+            position: absolute; top: 2px; left: 2px; 
+            background: rgba(0,0,0,0.6); color: white; 
+            width: 16px; height: 16px; border-radius: 50%; 
+            font-size: 9px; display: flex; align-items: center; 
+            justify-content: center; font-weight: bold; pointer-events: none; 
+        }
+        .ref-thumb .del-btn { 
+            position: absolute; top: 2px; right: 2px; 
+            background: rgba(0,0,0,0.5); color: white; 
+            width: 16px; height: 16px; border-radius: 50%; 
+            font-size: 10px; display: flex; align-items: center; 
+            justify-content: center; opacity: 0; transition: opacity 0.2s; 
+        }
         .ref-thumb:hover .del-btn { opacity: 1; }
 
         /* 上传区域 */
@@ -79,12 +178,19 @@
         
         /* 批量选择样式 */
         .selected-card { outline: 3px solid #DB4437; transform: scale(0.95); }
-        .check-circle { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: white; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .check-circle { 
+            position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; 
+            border-radius: 50%; background: white; border: 2px solid #ddd; 
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s; 
+        }
         .selected-card .check-circle { background: #DB4437; border-color: #DB4437; color: white; }
 
         /* 画质与积分卡片 */
         .quality-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-        .quality-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.2s; background: white; }
+        .quality-card { 
+            border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 4px; 
+            cursor: pointer; text-align: center; transition: all 0.2s; background: white; 
+        }
         .quality-card:hover { border-color: #cbd5e1; }
         .quality-card.active { border-color: #DB4437; background-color: #fef2f2; color: #b91c1c; }
         .quality-name { display: block; font-weight: 800; font-size: 12px; margin-bottom: 2px; }
@@ -147,7 +253,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v5.0 Enterprise Edition</p>
+                    <p class="text-slate-400 text-sm mt-1">v5.2 Enterprise (V4内核)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -184,7 +290,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.0</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.2</span>
                 </div>
             </header>
             
@@ -196,7 +302,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(强制垫图 - v3.7内核)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V4内核 - 强力垫图)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -271,15 +377,6 @@
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">💬 意见反馈</h3>
-                        <div class="space-y-3">
-                            <textarea id="feedback-content" rows="3" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="遇到 Bug 了？还是有什么新功能建议？"></textarea>
-                            <input type="text" id="feedback-contact" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="联系方式 (VX/Email，选填)">
-                            <button onclick="submitFeedback()" class="px-4 py-2 btn-primary rounded-lg text-sm shadow-md">提交反馈</button>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                          <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
                          <div class="flex items-center justify-between">
                             <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span><button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
@@ -292,7 +389,7 @@
     </div>
 
     <script>
-        // --- ⚙️ 核心配置区域 ---
+        // --- 6.1 全局配置与状态 ---
         const SERVER_CONFIG = {
             MODELS: {
                 '1k': 'gemini-3-pro-image-preview',
@@ -307,18 +404,22 @@
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let refImages = []; let selectedRefIds = new Set();
-        let isSelectMode = false; let selectedIds = new Set();
-        let currentLightboxId = null; let currentLightboxUrl = null; let currentLightboxPath = null;
+        let refImages = []; 
+        let selectedRefIds = new Set();
+        let isSelectMode = false; 
+        let selectedIds = new Set();
+        let currentLightboxId = null; 
+        let currentLightboxUrl = null; 
+        let currentLightboxPath = null;
         let currentStylePrompt = ""; 
         let abortController = null; 
 
-        // 积分系统变量 (V5.0: 主要用于UI显示)
+        // 积分系统变量 (UI显示用)
         let currentCredits = 0;
         let selectedQuality = '1k'; 
         let currentCost = 5;       
 
-        // --- 🚀 [V5.0 新增] 分页系统变量 ---
+        // 分页系统变量 (V5.0)
         let currentPage = 0; 
         const PAGE_SIZE = 20; 
         let hasMoreImages = true;
@@ -333,6 +434,7 @@
             { name: "森之屋", color: "bg-gradient-to-br from-emerald-400 to-green-600", prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves" }
         ];
 
+        // --- 6.2 初始化与监听 ---
         window.onload = async () => {
             const { data: { session } } = await db.auth.getSession();
             if (session) {
@@ -350,7 +452,7 @@
             renderStyles();
         };
 
-        // --- 💰 积分显示 ---
+        // --- 6.3 积分逻辑 (后端同步) ---
         async function fetchCredits() {
             const { data: { user } } = await db.auth.getUser();
             if (!user) return;
@@ -378,7 +480,7 @@
             updateCreditUI();
         }
 
-        // --- 身份验证逻辑 ---
+        // --- 6.4 身份验证 ---
         async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送，请查收邮件确认！"); }
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
@@ -401,26 +503,17 @@
             else { alert("密码已更新"); document.getElementById('new-password').value = ""; } 
         }
 
-        async function submitFeedback() {
-            const content = document.getElementById('feedback-content').value;
-            const contact = document.getElementById('feedback-contact').value;
-            if(!content) return alert("请填写内容");
-            const { data: { user } } = await db.auth.getUser();
-            const { error } = await db.from('feedback').insert({ user_id: user.id, content, contact });
-            if(error) alert("提交失败 (请检查数据库是否有 feedback 表): " + error.message); 
-            else { alert("感谢反馈！"); document.getElementById('feedback-content').value = ""; }
-        }
-
         function clearKeys() { 
             localStorage.removeItem('user_credits'); 
             alert("本地缓存已清除，刷新页面将从云端重新同步数据。"); 
             location.reload();
         }
 
-        // --- UI 渲染 ---
+        // --- 6.5 UI 渲染逻辑 ---
         function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
         function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
         
+        // --- 6.6 上传与垫图管理 ---
         function handleImageUpload(input) { 
             const files = Array.from(input.files); 
             if (!files.length) return; 
@@ -456,7 +549,7 @@
         function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
         function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
 
-        // --- 🚀 [V5.0 核心优化] 分页画廊逻辑 ---
+        // --- 6.7 分页画廊加载 (V5.0) ---
         async function loadGallery(reset = true) { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
@@ -525,12 +618,14 @@
             else grid.innerHTML = html;
         }
 
-        // --- 🚀 [V5.0 核心安全] 生成逻辑 (委托后端扣费) ---
+        // =======================================================
+        // 🚀 6.8 核心生成逻辑 (双重架构：V5后端 + V4内核) 🚀
+        // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
             
-            // 1. 本地简单预判
+            // 1. 积分预检
             if (currentCredits < currentCost) {
                 alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
                 return;
@@ -560,11 +655,27 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // 上传参考图
+                // --- 步骤 1: 上传参考图到 Temp 文件夹 (V4.1 核心逻辑) ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     const userId = session.user.id;
                     
+                    // V4.1 智能比例检测
+                    if (aspectStr === "original") {
+                        try {
+                            const img = new Image(); img.src = selectedImages[0].base64;
+                            await new Promise(r => img.onload = r);
+                            const ratio = img.width / img.height;
+                            if (ratio > 1.2) sizeParam = "1792x1024"; 
+                            else if (ratio < 0.8) sizeParam = "1024x1792";
+                            else sizeParam = "1024x1024";
+                        } catch(e) { sizeParam = "1024x1024"; }
+                    } else {
+                        if (aspectStr === "16:9") sizeParam = "1792x1024";
+                        else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                    }
+
+                    // 并发上传
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
@@ -582,28 +693,20 @@
                     }));
                 }
 
-                // 处理 Prompt (恢复 V4.4 强力垫图逻辑)
-preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
-if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
-if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
+                // --- 步骤 2: Prompt 注入 (V4.1 强力垫图逻辑) ---
+                preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
+                
+                if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
+                if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
+                if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
-// ★★★ 关键修复：把图片 URL 显式加入 Prompt，恢复“结构参考”能力 ★★★
-if (refImageUrls.length > 0) {
-    // 1. 先加风格参考参数 (Style Reference)
-    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-    
-    // 2. 再把图片地址硬写入 Prompt (Image Prompt) <- 之前漏了这步！
-    refImageUrls.forEach((url, i) => { 
-        finalPrompt += ` (Reference Image: ${url})`; 
-    });
-}
-
-                if (aspectStr === "original" && selectedImages.length > 0) {
-                     // 简单估算，实际可优化
-                     sizeParam = "1024x1024";
-                } else if(aspectStr === "16:9") sizeParam = "1792x1024";
-                else if(aspectStr === "3:4") sizeParam = "1024x1792";
+                if (refImageUrls.length > 0) {
+                     // ★★★ V4.1 灵魂注入：同时使用风格参考和内容引用 ★★★
+                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                     refImageUrls.forEach(url => { 
+                         finalPrompt += ` (Reference Image: ${url})`; 
+                     });
+                }
 
                 const paintPayload = { 
                     model: painterModelId, 
@@ -613,7 +716,7 @@ if (refImageUrls.length > 0) {
                     response_format: "b64_json" 
                 };
 
-                // ★★★ 3. 发送给后端代理 (附带 Token) ★★★
+                // --- 步骤 3: 发送给后端代理 (V5.0 商业级架构) ---
                 const paintRes = await fetch('/api/proxy', {
                     method: 'POST',
                     headers: { 
@@ -626,11 +729,11 @@ if (refImageUrls.length > 0) {
                 
                 const json = await paintRes.json();
                 
-                // 处理后端返回的错误
+                // 处理错误
                 if (paintRes.status === 402) throw new Error("余额不足 (后端拦截)");
                 if (paintRes.status !== 200) throw new Error(json.error?.message || "生成失败");
 
-                // 处理成功结果
+                // --- 步骤 4: 保存结果 ---
                 const rawB64 = json.data?.[0]?.b64_json;
                 const urlData = json.data?.[0]?.url;
 
@@ -638,7 +741,6 @@ if (refImageUrls.length > 0) {
 
                 preview.innerHTML = '<span class="animate-pulse text-green-600">正在保存...</span>';
 
-                // 转存图片
                 let imgBlob;
                 if (rawB64) imgBlob = base64ToBlob(rawB64, 'image/png');
                 else {
@@ -668,10 +770,9 @@ if (refImageUrls.length > 0) {
                     if (msg.includes("Failed to fetch")) msg = "网络连接失败";
                     preview.innerHTML = `❌ 失败<br><span class="text-xs text-red-500">${msg}</span>`;
                 }
-                // 恢复按钮
                 resetUI_Success();
             } finally {
-                // 清理临时文件
+                // --- 步骤 5: 清理 Temp 文件 (V4.1 阅后即焚) ---
                 if (tempUploadPaths.length > 0) {
                     db.storage.from('ai-images').remove(tempUploadPaths);
                 }
@@ -687,7 +788,7 @@ if (refImageUrls.length > 0) {
             btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
         }
 
-        // --- 辅助工具函数 ---
+        // --- 6.9 辅助工具函数 ---
         function base64ToBlob(base64, mimeType) {
             const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
             const byteCharacters = atob(cleanBase64);
@@ -705,7 +806,7 @@ if (refImageUrls.length > 0) {
             } catch (e) { window.open(url, '_blank'); }
         }
 
-        // 批量管理 & 灯箱逻辑 (完整恢复)
+        // --- 6.10 批量管理 & 灯箱逻辑 (完整实现) ---
         function handleCardClick(id, url, filePath) { 
             if (isSelectMode) { 
                 if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
@@ -727,7 +828,7 @@ if (refImageUrls.length > 0) {
             } else { 
                 btn.classList.replace('bg-red-50', 'bg-gray-100'); btn.classList.replace('text-red-600', 'text-gray-600'); 
                 bar.classList.add('translate-y-20'); selectedIds.clear(); 
-                loadGallery(); // 重绘以清除选中状态
+                loadGallery(); 
             } 
         }
 
@@ -778,4 +879,3 @@ if (refImageUrls.length > 0) {
     </script>
 </body>
 </html>
-
