@@ -3,14 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V4.5 安全版)</title>
+    <title>Z先森.AI - Pro (V5.0 Enterprise)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
     <style>
+        /* --- 全局样式定义 (完美复刻 V4.4) --- */
         body { background-color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
         
+        /* 按钮特效 */
         .btn-primary { 
             background: linear-gradient(135deg, #DB4437 0%, #C5221F 100%); 
             color: white; 
@@ -20,43 +23,66 @@
         .btn-primary:active { transform: translateY(0); }
         .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
 
+        /* 输入框交互 */
         .input-field { transition: all 0.2s; border: 1px solid #e2e8f0; }
         .input-field:focus { border-color: #DB4437; box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); }
 
+        /* 自定义 Checkbox */
         .checkbox-custom {
-            appearance: none; background-color: #fff; margin: 0; font: inherit; color: currentColor; width: 1.15em; height: 1.15em; border: 1px solid #cbd5e1; border-radius: 0.25em; display: grid; place-content: center; transition: all 0.2s; cursor: pointer;
+            appearance: none; background-color: #fff; margin: 0; font: inherit; color: currentColor; 
+            width: 1.15em; height: 1.15em; border: 1px solid #cbd5e1; border-radius: 0.25em; 
+            display: grid; place-content: center; transition: all 0.2s; cursor: pointer;
         }
-        .checkbox-custom::before { content: ""; width: 0.65em; height: 0.65em; transform: scale(0); transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em white; transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
+        .checkbox-custom::before { 
+            content: ""; width: 0.65em; height: 0.65em; transform: scale(0); 
+            transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em white; 
+            transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); 
+        }
         .checkbox-custom:checked { background-color: #DB4437; border-color: #DB4437; }
         .checkbox-custom:checked::before { transform: scale(1); }
 
+        /* 画廊网格 */
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        
+        /* 滚动条美化 */
         .thin-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
         .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .thin-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
         
-        .style-card { flex: 0 0 110px; height: 64px; border-radius: 12px; position: relative; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        /* 风格卡片 */
+        .style-card { 
+            flex: 0 0 110px; height: 64px; border-radius: 12px; position: relative; cursor: pointer; 
+            border: 2px solid transparent; transition: all 0.2s; overflow: hidden; 
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+        }
         .style-card span { position: relative; z-index: 10; color: white; font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .style-card.active { border-color: #DB4437; transform: scale(0.98); }
         .style-card.active::after { content: '✓'; position: absolute; top: 4px; right: 6px; color: white; font-size: 10px; font-weight: bold; }
 
-        .ref-thumb { flex: 0 0 70px; height: 70px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; overflow: hidden; position: relative; transition: all 0.2s; opacity: 0.6; filter: grayscale(50%); }
+        /* 参考图缩略图 */
+        .ref-thumb { 
+            flex: 0 0 70px; height: 70px; border-radius: 8px; border: 2px solid transparent; 
+            cursor: pointer; overflow: hidden; position: relative; transition: all 0.2s; 
+            opacity: 0.6; filter: grayscale(50%); 
+        }
         .ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .ref-thumb:hover { opacity: 0.8; }
         .ref-thumb.selected { border-color: #DB4437; ring: 2px solid #fee2e2; transform: scale(0.95); opacity: 1; filter: grayscale(0%); }
         
         .ref-number { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.6); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: none; }
-        
         .ref-thumb .del-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: white; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
         .ref-thumb:hover .del-btn { opacity: 1; }
 
+        /* 上传区域 */
         .upload-zone { border: 2px dashed #e2e8f0; transition: all 0.2s; }
         .upload-zone:hover { border-color: #DB4437; background: #fff1f2; }
         
+        /* 批量选择样式 */
         .selected-card { outline: 3px solid #DB4437; transform: scale(0.95); }
         .check-circle { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: white; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .selected-card .check-circle { background: #DB4437; border-color: #DB4437; color: white; }
 
+        /* 画质与积分卡片 */
         .quality-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
         .quality-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.2s; background: white; }
         .quality-card:hover { border-color: #cbd5e1; }
@@ -65,6 +91,7 @@
         .quality-cost { font-size: 10px; color: #64748b; }
         .quality-card.active .quality-cost { color: #b91c1c; font-weight: bold; }
         
+        /* 积分徽章 */
         .credit-badge { 
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
             color: #ffd700; 
@@ -77,6 +104,16 @@
             gap: 6px; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
+
+        /* [V5.0 新增] 加载更多按钮样式 */
+        .btn-load-more {
+            display: block; margin: 2rem auto; padding: 10px 30px; 
+            border: 1px solid #e2e8f0; background: white; color: #64748b; 
+            border-radius: 50px; font-weight: 600; font-size: 14px; 
+            transition: all 0.2s; cursor: pointer;
+        }
+        .btn-load-more:hover { border-color: #DB4437; color: #DB4437; }
+        .btn-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body class="h-screen overflow-hidden text-slate-700 bg-slate-50">
@@ -110,11 +147,11 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v4.5 Secure Edition</p>
+                    <p class="text-slate-400 text-sm mt-1">v5.0 Enterprise Edition</p>
                 </div>
                 <div class="space-y-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" autocomplete="username" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" autocomplete="current-password" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="••••••••"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="••••••••"></div>
                     <div class="flex items-center justify-between mt-2">
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="remember-me" class="checkbox-custom" checked><span class="text-sm text-slate-500 font-medium select-none">记住我</span></label>
                         <button onclick="forgotPassword()" class="text-sm font-bold text-red-600 hover:text-red-700 hover:underline">忘记密码?</button>
@@ -147,7 +184,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V4.5</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.0</span>
                 </div>
             </header>
             
@@ -209,6 +246,7 @@
                     <button onclick="loadGallery()" class="text-sm text-red-600 hover:underline">刷新</button>
                 </div>
                 <div id="gallery-grid" class="gallery-grid"></div>
+                <button id="btn-load-more" onclick="loadMoreImages()" class="btn-load-more hidden">vv 加载更多图片 vv</button>
             </div>
 
             <div id="view-profile" class="hidden flex-1 overflow-y-auto p-8 bg-slate-50">
@@ -242,13 +280,11 @@
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span>
-                            <button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
-                        </div>
+                         <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
+                         <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span><button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
+                         </div>
                     </div>
-
                 </div>
             </div>
 
@@ -257,10 +293,7 @@
 
     <script>
         // --- ⚙️ 核心配置区域 ---
-        const MY_HIDDEN_KEY = ""; 
-
         const SERVER_CONFIG = {
-            BASE_URL: "", 
             MODELS: {
                 '1k': 'gemini-3-pro-image-preview',
                 '2k': 'gemini-3-pro-image-preview-2k-vip',
@@ -280,10 +313,15 @@
         let currentStylePrompt = ""; 
         let abortController = null; 
 
-        // 积分系统变量 (现在只做显示用，真实数据在云端)
+        // 积分系统变量 (V5.0: 主要用于UI显示)
         let currentCredits = 0;
         let selectedQuality = '1k'; 
         let currentCost = 5;       
+
+        // --- 🚀 [V5.0 新增] 分页系统变量 ---
+        let currentPage = 0; 
+        const PAGE_SIZE = 20; 
+        let hasMoreImages = true;
 
         const styles = [
             { name: "默认", color: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500", prompt: "" },
@@ -296,16 +334,15 @@
         ];
 
         window.onload = async () => {
-            // 页面加载时检查登录状态
             const { data: { session } } = await db.auth.getSession();
             if (session) {
                 enterApp(session.user);
-                fetchCredits(); // 登录后立刻去云端查积分
+                fetchCredits();
             }
             db.auth.onAuthStateChange((_, session) => {
                 if(session) {
                     enterApp(session.user);
-                    fetchCredits(); // 状态改变时也查一下
+                    fetchCredits();
                 } else {
                     leaveApp();
                 }
@@ -313,18 +350,11 @@
             renderStyles();
         };
 
-        // --- 💰 云端积分系统 (V4.5 新增) ---
-        // 不再读取 LocalStorage，而是去 profiles 表里查
+        // --- 💰 积分显示 ---
         async function fetchCredits() {
             const { data: { user } } = await db.auth.getUser();
             if (!user) return;
-
-            const { data, error } = await db
-                .from('profiles')
-                .select('credits')
-                .eq('id', user.id)
-                .single();
-
+            const { data } = await db.from('profiles').select('credits').eq('id', user.id).single();
             if (data) {
                 currentCredits = data.credits;
                 updateCreditUI();
@@ -348,7 +378,7 @@
             updateCreditUI();
         }
 
-        // --- 身份验证 ---
+        // --- 身份验证逻辑 ---
         async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送，请查收邮件确认！"); }
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
@@ -387,12 +417,10 @@
             location.reload();
         }
 
-
-        // --- UI 逻辑 ---
+        // --- UI 渲染 ---
         function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
         function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
         
-        // --- 垫图逻辑 ---
         function handleImageUpload(input) { 
             const files = Array.from(input.files); 
             if (!files.length) return; 
@@ -416,123 +444,110 @@
             const placeholder = document.getElementById('upload-placeholder'); 
             countLabel.innerText = `${refImages.length}/10`; 
             if (refImages.length > 0) { 
-                tray.classList.remove('hidden'); 
-                placeholder.classList.add('h-12'); 
-                placeholder.querySelector('span').innerText = "继续添加 +"; 
+                tray.classList.remove('hidden'); placeholder.classList.add('h-12'); placeholder.querySelector('span').innerText = "继续添加 +"; 
             } else { 
-                tray.classList.add('hidden'); 
-                placeholder.classList.remove('h-12'); 
-                placeholder.querySelector('span').innerText = "📤 拖拽或点击上传"; 
+                tray.classList.add('hidden'); placeholder.classList.remove('h-12'); placeholder.querySelector('span').innerText = "📤 拖拽或点击上传"; 
             } 
             tray.innerHTML = refImages.map((img, index) => `
                 <div class="ref-thumb ${selectedRefIds.has(img.id) ? 'selected' : ''}" onclick="toggleRef(${img.id})">
-                    <img src="${img.base64}">
-                    <div class="ref-number">${index + 1}</div>
-                    <div class="del-btn" onclick="event.stopPropagation(); removeRef(${img.id})">✕</div>
-                </div>
-            `).join(''); 
+                    <img src="${img.base64}"><div class="ref-number">${index + 1}</div><div class="del-btn" onclick="event.stopPropagation(); removeRef(${img.id})">✕</div>
+                </div>`).join(''); 
         }
-        
         function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
         function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
 
-        function resetUI_Success() {
-            const btn = document.getElementById('btn-gen');
-            abortController = null;
-            // 生成成功后，再查一次云端积分，确保显示准确
-            fetchCredits(); 
-            btn.onclick = generate;
-            btn.classList.remove('bg-gray-400', 'hover:bg-gray-500', 'text-white');
-            btn.classList.add('btn-primary');
-            btn.disabled = false;
-        }
+        // --- 🚀 [V5.0 核心优化] 分页画廊逻辑 ---
+        async function loadGallery(reset = true) { 
+            const { data: { user } } = await db.auth.getUser();
+            if (!user) return; 
+            
+            if (reset) {
+                currentPage = 0;
+                document.getElementById('gallery-grid').innerHTML = '';
+                hasMoreImages = true;
+            }
 
-        function resetUI_AbortOrError(msg) {
-            resetUI_Success(); 
-            const preview = document.getElementById('preview');
-            const safeContent = DOMPurify.sanitize(`<span class="text-gray-400">${msg || '🚫 已中止生成'}</span>`);
-            preview.innerHTML = safeContent;
-        }
+            const from = currentPage * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+            const btnMore = document.getElementById('btn-load-more');
+            
+            btnMore.innerText = "加载中...";
+            
+            const { data, error } = await db
+                .from('images')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .range(from, to); 
+            
+            if (data && data.length > 0) { 
+                renderGalleryGrid(data, !reset); 
+                if (data.length < PAGE_SIZE) hasMoreImages = false;
+            } else {
+                hasMoreImages = false;
+            }
 
-        function handleUserStop() {
-            if (abortController) {
-                abortController.abort(); 
+            if (hasMoreImages) {
+                btnMore.classList.remove('hidden');
+                btnMore.innerText = "vv 加载更多图片 vv";
+                btnMore.disabled = false;
+            } else {
+                btnMore.classList.add('hidden');
             }
         }
 
-        async function downloadImage(url) {
-            try {
-                const response = await fetch(url);
-                const blob = await response.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = `z_ai_${Date.now()}.png`; 
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(blobUrl);
-            } catch (e) {
-                console.error('Download failed:', e);
-                window.open(url, '_blank'); 
-            }
+        function loadMoreImages() {
+            currentPage++;
+            loadGallery(false);
         }
 
-        function base64ToBlob(base64, mimeType) {
-            const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
-            const byteCharacters = atob(cleanBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            return new Blob([byteArray], { type: mimeType });
+        function renderGalleryGrid(data, append = false) { 
+            const html = data.map(img => `
+                <div id="card-${img.id}" class="bg-white rounded overflow-hidden shadow group relative border border-gray-100 cursor-pointer transition-all" onclick="handleCardClick(${img.id}, '${img.image_url}', '${img.file_path||''}')">
+                    <div class="aspect-square relative">
+                        <img src="${img.image_url}" class="w-full h-full object-cover">
+                        <div class="normal-overlay absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100 ${isSelectMode ? 'hidden' : ''}">
+                            <span class="text-white bg-black/50 px-3 py-1 rounded-full text-xs">👀 查看</span>
+                        </div>
+                        <div class="batch-overlay check-circle ${isSelectMode ? '' : 'hidden'}"></div>
+                    </div>
+                    <div class="p-2 flex justify-between items-center bg-gray-50">
+                        <span class="text-[10px] text-gray-500 truncate w-20">${img.prompt}</span>
+                        <div class="flex gap-2">
+                            <span class="text-[9px] uppercase font-bold text-red-500">Pro</span>
+                            <button onclick="event.stopPropagation(); deleteSingle(${img.id}, '${img.file_path||''}', '${img.image_url}')" class="text-gray-400 hover:text-red-500 ${isSelectMode ? 'hidden' : ''}" title="删除">🗑️</button>
+                        </div>
+                    </div>
+                </div>`).join('');
+            
+            const grid = document.getElementById('gallery-grid');
+            if (append) grid.insertAdjacentHTML('beforeend', html);
+            else grid.innerHTML = html;
         }
 
-        // --- 🚀 核心生成函数（V4.5 安全版） ---
+        // --- 🚀 [V5.0 核心安全] 生成逻辑 (委托后端扣费) ---
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
             
-            // 1. UI 层预检查（防君子）
+            // 1. 本地简单预判
             if (currentCredits < currentCost) {
                 alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
                 return;
             }
 
-            // --- 🔴 2. 云端安全扣费（防小人）---
-            // 这里调用了之前 SQL 创建的函数，如果后端积分不足，会直接报错
-            try {
-                const { data: { user } } = await db.auth.getUser();
-                const { error: creditError } = await db.rpc('decrement_credits', { 
-                    count: currentCost, 
-                    x_user_id: user.id 
-                });
-
-                if (creditError) {
-                    console.error("扣费失败:", creditError);
-                    alert("生成失败：您的云端积分不足或数据异常。");
-                    return; // 扣费失败直接退出，不发 API 请求
-                }
-
-                // 扣费成功，更新本地 UI
-                currentCredits -= currentCost;
-                updateCreditUI();
-
-            } catch (err) {
-                console.error(err);
-                alert("系统错误：无法连接到积分数据库。");
-                return;
-            }
-            // ------------------------------------
-
             abortController = new AbortController();
             const signal = abortController.signal;
 
-            btn.innerText = "🛑 停止生成 (积分已扣除)";
+            btn.innerText = "🛑 停止生成 (后端处理中)";
             btn.classList.remove('btn-primary');
             btn.classList.add('bg-gray-400', 'hover:bg-gray-500', 'text-white');
-            btn.onclick = handleUserStop; 
+            btn.onclick = () => abortController.abort(); 
+
+            // 2. 获取 Token (关键安全凭证)
+            const { data: { session } } = await db.auth.getSession();
+            if (!session) return alert("请重新登录");
+            const token = session.access_token; 
 
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
@@ -545,222 +560,173 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
+                // 上传参考图
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
-                    const { data: { user } } = await db.auth.getUser();
-                    const userId = user ? user.id : 'anon';
+                    const userId = session.user.id;
                     
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
                             const blob = base64ToBlob(base64Data, 'image/png');
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
-                            
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
                             if (uploadError) throw uploadError; 
-
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
                         } catch (e) { 
                             console.error("上传出错:", e);
-                            alert("参考图上传失败！请检查网络或图片大小（不要超过50MB）。");
-                            throw new Error("已强制中止生成"); 
+                            throw new Error("参考图上传失败，请检查网络或图片大小。"); 
                         }
                     }));
-
-                    if (aspectStr === "original") {
-                        try {
-                            const img = new Image(); img.src = selectedImages[0].base64;
-                            await new Promise(r => img.onload = r);
-                            const ratio = img.width / img.height;
-                            if (ratio > 1.2) { sizeParam = "1792x1024"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 横图模式</div>'; }
-                            else if (ratio < 0.8) { sizeParam = "1024x1792"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 竖图模式</div>'; }
-                            else { sizeParam = "1024x1024"; preview.innerHTML += '<div class="text-xs text-gray-400 text-center mb-1">📏 方图模式</div>'; }
-                        } catch(e){ sizeParam = "1024x1024"; }
-                    } else {
-                        if (aspectStr === "16:9") sizeParam = "1792x1024";
-                        else if (aspectStr === "3:4") sizeParam = "1024x1792";
-                        else sizeParam = "1024x1024";
-                    }
-                } else {
-                    if (aspectStr === "16:9") sizeParam = "1792x1024";
-                    else if (aspectStr === "3:4") sizeParam = "1024x1792";
-                    else sizeParam = "1024x1024";
                 }
 
-                preview.innerHTML = '<span class="animate-pulse text-red-600">正在极速渲染中...</span>';
-                
+                // 处理 Prompt
+                preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
-                if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
+                if (refImageUrls.length > 0) finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
 
-                if (refImageUrls.length > 0) {
-                    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                    refImageUrls.forEach((url, i) => { finalPrompt += ` (Reference Image: ${url})`; });
-                }
+                if (aspectStr === "original" && selectedImages.length > 0) {
+                     // 简单估算，实际可优化
+                     sizeParam = "1024x1024";
+                } else if(aspectStr === "16:9") sizeParam = "1792x1024";
+                else if(aspectStr === "3:4") sizeParam = "1024x1792";
 
                 const paintPayload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
-                    size: sizeParam, 
+                    size: sizeParam,
                     n: 1,
                     response_format: "b64_json" 
                 };
 
+                // ★★★ 3. 发送给后端代理 (附带 Token) ★★★
                 const paintRes = await fetch('/api/proxy', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
                     body: JSON.stringify(paintPayload),
                     signal: signal 
                 });
                 
-                if (paintRes.status === 429) throw new Error("API 额度不足 (429)。");
-                const paintData = await paintRes.json();
+                const json = await paintRes.json();
                 
-                if(paintData.error) throw new Error(paintData.error.message);
-                
-                const rawB64 = paintData.data?.[0]?.b64_json;
-                const urlData = paintData.data?.[0]?.url;
+                // 处理后端返回的错误
+                if (paintRes.status === 402) throw new Error("余额不足 (后端拦截)");
+                if (paintRes.status !== 200) throw new Error(json.error?.message || "生成失败");
+
+                // 处理成功结果
+                const rawB64 = json.data?.[0]?.b64_json;
+                const urlData = json.data?.[0]?.url;
 
                 if (!rawB64 && !urlData) throw new Error("API 未返回有效图片数据");
 
                 preview.innerHTML = '<span class="animate-pulse text-green-600">正在保存...</span>';
 
-                try {
-                    const { data: { user } } = await db.auth.getUser();
-                    let imgBlob;
-                    let finalSrcForDisplay;
-
-                    if (rawB64) {
-                        imgBlob = base64ToBlob(rawB64, 'image/png');
-                        finalSrcForDisplay = rawB64.startsWith('data:') ? rawB64 : `data:image/png;base64,${rawB64}`;
-                    } else {
-                        const imgRes = await fetch(urlData);
-                        imgBlob = await imgRes.blob();
-                        finalSrcForDisplay = urlData;
-                    }
-                    
-                    const fileName = `${user.id}/${Date.now()}.png`;
-                    
-                    const { error: uploadErr } = await db.storage.from('ai-images').upload(fileName, imgBlob, { 
-                        contentType: 'image/png',
-                        upsert: true 
-                    });
-                    
-                    if (uploadErr) throw uploadErr;
-
-                    const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(fileName);
-                    
-                    await db.from('images').insert({ 
-                        user_id: user.id, prompt: userPrompt, image_url: publicUrl, 
-                        file_path: fileName, engine: 'banana-pro-v4.3', seed: 0 
-                    });
-                    
-                    preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
-                    loadGallery(); 
-                    
-                } catch (err) {
-                    console.warn("转存失败:", err);
-                    let fallbackSrc = urlData;
-                    if(rawB64) {
-                         fallbackSrc = rawB64.startsWith('data:') ? rawB64 : `data:image/png;base64,${rawB64}`;
-                    }
-                    preview.innerHTML = `<img src="${fallbackSrc}" class="rounded shadow-lg max-h-[70vh]"><div class="text-xs text-center mt-2 text-red-500 font-bold">⚠️ 云存储失败 (${err.message})，请立即右键保存图片！</div>`;
+                // 转存图片
+                let imgBlob;
+                if (rawB64) imgBlob = base64ToBlob(rawB64, 'image/png');
+                else {
+                    const imgRes = await fetch(urlData);
+                    imgBlob = await imgRes.blob();
                 }
+                
+                const fileName = `${session.user.id}/${Date.now()}.png`;
+                const { error: uploadErr } = await db.storage.from('ai-images').upload(fileName, imgBlob, { contentType: 'image/png', upsert: true });
+                if (uploadErr) throw uploadErr;
 
-                resetUI_Success(); 
+                const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(fileName);
+                await db.from('images').insert({ user_id: session.user.id, prompt: userPrompt, image_url: publicUrl, file_path: fileName });
+                
+                preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
+                
+                // 刷新数据
+                fetchCredits();
+                loadGallery();
+                resetUI_Success();
 
             } catch (e) {
-                console.error(e);
-                // 发生错误时，这里不再自动退分了
-                // 因为积分是在数据库里扣的，如果要退分，还需要写一个 increment_credits 的 SQL 函数
-                // 暂时简单处理：提示用户联系管理员退分
-                
                 if (e.name === 'AbortError') { 
-                    resetUI_AbortOrError('🚫 已中止生成');
+                    preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
                 } else {
                     let msg = e.message;
                     if (msg.includes("Failed to fetch")) msg = "网络连接失败";
-                    resetUI_AbortOrError(`❌ 生成失败<br><span class="text-xs">${msg}</span><br><span class="text-xs text-red-600 font-bold">积分已扣除，请联系管理员</span>`);
+                    preview.innerHTML = `❌ 失败<br><span class="text-xs text-red-500">${msg}</span>`;
                 }
+                // 恢复按钮
+                resetUI_Success();
             } finally {
+                // 清理临时文件
                 if (tempUploadPaths.length > 0) {
-                    db.storage.from('ai-images').remove(tempUploadPaths).then(({ error }) => {
-                        if (error) console.warn("临时文件清理失败:", error);
-                    });
+                    db.storage.from('ai-images').remove(tempUploadPaths);
                 }
             }
         }
 
-        // --- 辅助功能 ---
-        async function loadGallery() { 
-            const { data: { user } } = await db.auth.getUser();
-            if (!user) return; 
-            const { data } = await db.from('images').select('*').eq('user_id', user.id).order('created_at', { ascending: false }); 
-            if(data) { renderGalleryGrid(data); selectedIds.clear(); updateBatchUI(); } 
-        }
-        
-        function renderGalleryGrid(data) { 
-            document.getElementById('gallery-grid').innerHTML = data.map(img => {
-                const safePath = img.file_path || ''; 
-                return `
-                <div id="card-${img.id}" class="bg-white rounded overflow-hidden shadow group relative border border-gray-100 cursor-pointer transition-all" onclick="handleCardClick(${img.id}, '${img.image_url}', '${safePath}')">
-                    <div class="aspect-square relative">
-                        <img src="${img.image_url}" class="w-full h-full object-cover">
-                        <div class="normal-overlay absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100 ${isSelectMode ? 'hidden' : ''}">
-                            <span class="text-white bg-black/50 px-3 py-1 rounded-full text-xs">👀 查看</span>
-                        </div>
-                        <div class="batch-overlay check-circle ${isSelectMode ? '' : 'hidden'}"></div>
-                    </div>
-                    <div class="p-2 flex justify-between items-center bg-gray-50">
-                        <span class="text-[10px] text-gray-500 truncate w-20">${img.prompt}</span>
-                        <div class="flex gap-2">
-                            <span class="text-[9px] uppercase font-bold text-red-500">Pro</span>
-                            <button onclick="event.stopPropagation(); deleteSingle(${img.id}, '${safePath}', '${img.image_url}')" class="text-gray-400 hover:text-red-500 ${isSelectMode ? 'hidden' : ''}" title="删除">🗑️</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join(''); 
+        function resetUI_Success() {
+            const btn = document.getElementById('btn-gen');
+            abortController = null;
+            btn.onclick = generate;
+            btn.classList.remove('bg-gray-400', 'hover:bg-gray-500', 'text-white');
+            btn.classList.add('btn-primary');
+            btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
         }
 
+        // --- 辅助工具函数 ---
+        function base64ToBlob(base64, mimeType) {
+            const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
+            const byteCharacters = atob(cleanBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+
+        async function downloadImage(url) {
+            try {
+                const response = await fetch(url); const blob = await response.blob(); const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = blobUrl; a.download = `z_ai_${Date.now()}.png`; 
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(blobUrl);
+            } catch (e) { window.open(url, '_blank'); }
+        }
+
+        // 批量管理 & 灯箱逻辑 (完整恢复)
         function handleCardClick(id, url, filePath) { 
             if (isSelectMode) { 
                 if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
                 const card = document.getElementById(`card-${id}`), circle = card.querySelector('.check-circle'); 
                 if (selectedIds.has(id)) { card.classList.add('selected-card'); circle.innerText = '✓'; } 
                 else { card.classList.remove('selected-card'); circle.innerText = ''; } 
-                updateBatchUI(); 
+                document.getElementById('select-count').innerText = selectedIds.size;
             } else { 
                 openLightbox(url, id, filePath); 
             } 
         }
 
-        function toggleSelectMode() { isSelectMode = !isSelectMode; const btn = document.getElementById('btn-batch-toggle'), bar = document.getElementById('batch-bar'); if (isSelectMode) { btn.classList.replace('bg-gray-100', 'bg-red-50'); btn.classList.replace('text-gray-600', 'text-red-600'); bar.classList.remove('hidden', 'translate-y-20'); } else { btn.classList.replace('bg-red-50', 'bg-gray-100'); btn.classList.replace('text-red-600', 'text-gray-600'); bar.classList.add('translate-y-20'); selectedIds.clear(); } loadGallery(); }
-        function updateBatchUI() { document.getElementById('select-count').innerText = selectedIds.size; }
-
-        async function performDeletion(id, filePath, url) { 
-            try { 
-                let path = filePath;
-                if (!path && url) { path = decodeURIComponent(url.split('/ai-images/')[1]); }
-                if (path) { await db.storage.from('ai-images').remove([path]); }
-            } catch (e) { console.warn("File delete error:", e); } 
-            
-            const { error } = await db.from('images').delete().eq('id', id); 
-            if(error) throw error; 
+        function toggleSelectMode() { 
+            isSelectMode = !isSelectMode; 
+            const btn = document.getElementById('btn-batch-toggle'), bar = document.getElementById('batch-bar'); 
+            if (isSelectMode) { 
+                btn.classList.replace('bg-gray-100', 'bg-red-50'); btn.classList.replace('text-gray-600', 'text-red-600'); 
+                bar.classList.remove('hidden', 'translate-y-20'); 
+            } else { 
+                btn.classList.replace('bg-red-50', 'bg-gray-100'); btn.classList.replace('text-red-600', 'text-gray-600'); 
+                bar.classList.add('translate-y-20'); selectedIds.clear(); 
+                loadGallery(); // 重绘以清除选中状态
+            } 
         }
 
         async function deleteSingle(id, filePath, url) { 
             if (!confirm("确定删除？")) return; 
-            const el = document.getElementById(`card-${id}`); 
-            if (el) el.style.opacity = '0.3'; 
+            const el = document.getElementById(`card-${id}`); if (el) el.style.opacity = '0.3'; 
             try { 
-                await performDeletion(id, filePath, url); 
-                if(el) el.remove(); 
-            } catch(e) { 
-                alert("删除失败"); 
-                if(el) el.style.opacity='1'; 
-            } 
+                if (filePath) await db.storage.from('ai-images').remove([filePath]); 
+                const { error } = await db.from('images').delete().eq('id', id); 
+                if(error) throw error; if(el) el.remove(); 
+            } catch(e) { alert("删除失败"); if(el) el.style.opacity='1'; } 
         }
 
         async function deleteBatch() { 
@@ -770,38 +736,32 @@
             const { data: files } = await db.from('images').select('file_path').in('id', idsArray); 
             const paths = files.map(f => f.file_path).filter(p => p); 
             if(paths.length) await db.storage.from('ai-images').remove(paths); 
-            const {error} = await db.from('images').delete().in('id', idsArray); 
-            if(error) return alert("删除失败"); 
-            idsArray.forEach(id=>{const el=document.getElementById(`card-${id}`);if(el)el.remove()}); 
+            await db.from('images').delete().in('id', idsArray); 
             toggleSelectMode(); 
         }
 
         function openLightbox(url, id, filePath) { 
-            currentLightboxId = id; 
-            currentLightboxUrl = url; 
-            currentLightboxPath = filePath;
+            currentLightboxId = id; currentLightboxUrl = url; currentLightboxPath = filePath;
             document.getElementById('lightbox-img').src = url; 
-            const dlBtn = document.getElementById('lightbox-download');
-            dlBtn.onclick = () => downloadImage(url);
+            document.getElementById('lightbox-download').onclick = () => downloadImage(url);
             document.getElementById('lightbox').classList.remove('hidden'); 
-            document.getElementById('lightbox-del-btn').onclick = deleteCurrentInLightbox; 
+            document.getElementById('lightbox-del-btn').onclick = async () => { 
+                if(confirm("确定删除？")) { 
+                    try { if(filePath) await db.storage.from('ai-images').remove([filePath]); await db.from('images').delete().eq('id', id); closeLightbox(); loadGallery(); } 
+                    catch(e) { alert(e.message); } 
+                } 
+            };
         }
-
         function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
-        async function deleteCurrentInLightbox() { if(currentLightboxId) { if(!confirm("确定删除？")) return; try { await performDeletion(currentLightboxId, currentLightboxPath, currentLightboxUrl); closeLightbox(); loadGallery(); } catch(e) { alert(e.message); } } }
         
         function switchTab(tab) { 
-            document.getElementById('view-create').classList.add('hidden'); 
-            document.getElementById('view-gallery').classList.add('hidden'); 
-            document.getElementById('view-profile').classList.add('hidden'); 
-            document.getElementById('tab-create').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
-            document.getElementById('tab-gallery').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
-            document.getElementById('tab-profile').classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            ['create','gallery','profile'].forEach(t => {
+                document.getElementById('view-'+t).classList.add('hidden');
+                document.getElementById('tab-'+t).classList.remove('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
+            });
             document.getElementById('view-' + tab).classList.remove('hidden');
             document.getElementById('tab-' + tab).classList.add('text-red-600', 'bg-red-50', 'border-r-2', 'border-red-600');
-            if(tab === 'profile') document.getElementById('main-header').classList.add('hidden');
-            else document.getElementById('main-header').classList.remove('hidden');
-            if(tab === 'gallery') loadGallery();
+            if(tab === 'gallery') loadGallery(true);
         }
     </script>
 </body>
