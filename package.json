@@ -10,7 +10,8 @@
   "express": "^4.18.2",
   "cors": "^2.8.5",
   "node-fetch": "^2.6.11", 
-  "@supabase/supabase-js": "^2.39.0"  <-- 手动加上这一行
+  "@supabase/supabase-js": "^2.39.0"
 }
 }
+
 
