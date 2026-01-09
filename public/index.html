@@ -582,10 +582,22 @@
                     }));
                 }
 
-                // 处理 Prompt
-                preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
-                if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                if (refImageUrls.length > 0) finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                // 处理 Prompt (恢复 V4.4 强力垫图逻辑)
+preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
+if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
+if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
+if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
+
+// ★★★ 关键修复：把图片 URL 显式加入 Prompt，恢复“结构参考”能力 ★★★
+if (refImageUrls.length > 0) {
+    // 1. 先加风格参考参数 (Style Reference)
+    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+    
+    // 2. 再把图片地址硬写入 Prompt (Image Prompt) <- 之前漏了这步！
+    refImageUrls.forEach((url, i) => { 
+        finalPrompt += ` (Reference Image: ${url})`; 
+    });
+}
 
                 if (aspectStr === "original" && selectedImages.length > 0) {
                      // 简单估算，实际可优化
@@ -766,3 +778,4 @@
     </script>
 </body>
 </html>
+
