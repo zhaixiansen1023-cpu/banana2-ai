@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V4.4 稳定版)</title>
+    <title>Z先森.AI - Pro (V4.5 安全版)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
@@ -110,7 +110,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v4.4 Stable Edition</p>
+                    <p class="text-slate-400 text-sm mt-1">v4.5 Secure Edition</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" autocomplete="username" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -147,7 +147,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V4.4</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V4.5</span>
                 </div>
             </header>
             
@@ -280,10 +280,10 @@
         let currentStylePrompt = ""; 
         let abortController = null; 
 
-        // 积分系统变量
+        // 积分系统变量 (现在只做显示用，真实数据在云端)
         let currentCredits = 0;
-        let selectedQuality = '1k'; // 默认1k
-        let currentCost = 5;       // 默认消耗
+        let selectedQuality = '1k'; 
+        let currentCost = 5;       
 
         const styles = [
             { name: "默认", color: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500", prompt: "" },
@@ -296,23 +296,39 @@
         ];
 
         window.onload = async () => {
-            initCredits();
+            // 页面加载时检查登录状态
             const { data: { session } } = await db.auth.getSession();
-            if (session) enterApp(session.user);
-            db.auth.onAuthStateChange((_, session) => session ? enterApp(session.user) : leaveApp());
+            if (session) {
+                enterApp(session.user);
+                fetchCredits(); // 登录后立刻去云端查积分
+            }
+            db.auth.onAuthStateChange((_, session) => {
+                if(session) {
+                    enterApp(session.user);
+                    fetchCredits(); // 状态改变时也查一下
+                } else {
+                    leaveApp();
+                }
+            });
             renderStyles();
         };
 
-        // --- 💰 积分系统 ---
-        function initCredits() {
-            const saved = localStorage.getItem('user_credits');
-            if (saved === null) {
-                currentCredits = 100; 
-                localStorage.setItem('user_credits', 100);
-            } else {
-                currentCredits = parseInt(saved);
+        // --- 💰 云端积分系统 (V4.5 新增) ---
+        // 不再读取 LocalStorage，而是去 profiles 表里查
+        async function fetchCredits() {
+            const { data: { user } } = await db.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await db
+                .from('profiles')
+                .select('credits')
+                .eq('id', user.id)
+                .single();
+
+            if (data) {
+                currentCredits = data.credits;
+                updateCreditUI();
             }
-            updateCreditUI();
         }
 
         function updateCreditUI() {
@@ -333,7 +349,7 @@
         }
 
         // --- 身份验证 ---
-        async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送"); }
+        async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送，请查收邮件确认！"); }
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
         async function signOut() { await db.auth.signOut(); }
@@ -342,12 +358,11 @@
             document.getElementById('auth-view').classList.add('hidden'); 
             document.getElementById('app-view').classList.remove('hidden'); 
             document.getElementById('profile-email').innerText = user.email;
-            document.getElementById('profile-id').innerText = user.id; // 恢复 ID 显示
+            document.getElementById('profile-id').innerText = user.id; 
             loadGallery(); 
         }
         function leaveApp() { document.getElementById('auth-view').classList.remove('hidden'); document.getElementById('app-view').classList.add('hidden'); }
 
-        // --- 🆕 恢复的个人中心功能逻辑 ---
         async function updatePassword() { 
             const newPw = document.getElementById('new-password').value; 
             if(!newPw || newPw.length < 6) return alert("密码太短"); 
@@ -361,15 +376,15 @@
             const contact = document.getElementById('feedback-contact').value;
             if(!content) return alert("请填写内容");
             const { data: { user } } = await db.auth.getUser();
-            // 注意：这需要 Supabase 里有 'feedback' 表
             const { error } = await db.from('feedback').insert({ user_id: user.id, content, contact });
             if(error) alert("提交失败 (请检查数据库是否有 feedback 表): " + error.message); 
             else { alert("感谢反馈！"); document.getElementById('feedback-content').value = ""; }
         }
 
         function clearKeys() { 
-            localStorage.removeItem('gg_key'); 
-            alert("本地缓存已清除 (注: V4版本使用内置 Key，此操作仅清除旧缓存)"); 
+            localStorage.removeItem('user_credits'); 
+            alert("本地缓存已清除，刷新页面将从云端重新同步数据。"); 
+            location.reload();
         }
 
 
@@ -377,7 +392,7 @@
         function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
         function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
         
-        // --- 垫图逻辑优化 ---
+        // --- 垫图逻辑 ---
         function handleImageUpload(input) { 
             const files = Array.from(input.files); 
             if (!files.length) return; 
@@ -424,7 +439,8 @@
         function resetUI_Success() {
             const btn = document.getElementById('btn-gen');
             abortController = null;
-            updateCreditUI(); 
+            // 生成成功后，再查一次云端积分，确保显示准确
+            fetchCredits(); 
             btn.onclick = generate;
             btn.classList.remove('bg-gray-400', 'hover:bg-gray-500', 'text-white');
             btn.classList.add('btn-primary');
@@ -462,11 +478,8 @@
             }
         }
 
-        // --- 🛠️ 辅助工具函数：增强版 Base64 转 Blob (关键修复) ---
         function base64ToBlob(base64, mimeType) {
-            // 关键修复：自动清理可能存在的 dataURI 前缀和空格，防止 atob 报错
             const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
-            
             const byteCharacters = atob(cleanBase64);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -476,33 +489,54 @@
             return new Blob([byteArray], { type: mimeType });
         }
 
-        // --- 🚀 核心生成函数（V4.4 稳定版） ---
+        // --- 🚀 核心生成函数（V4.5 安全版） ---
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
             
+            // 1. UI 层预检查（防君子）
             if (currentCredits < currentCost) {
                 alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
                 return;
             }
 
-            currentCredits -= currentCost;
-            localStorage.setItem('user_credits', currentCredits);
-            updateCreditUI(); 
+            // --- 🔴 2. 云端安全扣费（防小人）---
+            // 这里调用了之前 SQL 创建的函数，如果后端积分不足，会直接报错
+            try {
+                const { data: { user } } = await db.auth.getUser();
+                const { error: creditError } = await db.rpc('decrement_credits', { 
+                    count: currentCost, 
+                    x_user_id: user.id 
+                });
+
+                if (creditError) {
+                    console.error("扣费失败:", creditError);
+                    alert("生成失败：您的云端积分不足或数据异常。");
+                    return; // 扣费失败直接退出，不发 API 请求
+                }
+
+                // 扣费成功，更新本地 UI
+                currentCredits -= currentCost;
+                updateCreditUI();
+
+            } catch (err) {
+                console.error(err);
+                alert("系统错误：无法连接到积分数据库。");
+                return;
+            }
+            // ------------------------------------
 
             abortController = new AbortController();
             const signal = abortController.signal;
 
-            btn.innerText = "🛑 停止生成 (积分已预扣)";
+            btn.innerText = "🛑 停止生成 (积分已扣除)";
             btn.classList.remove('btn-primary');
             btn.classList.add('bg-gray-400', 'hover:bg-gray-500', 'text-white');
             btn.onclick = handleUserStop; 
 
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
-            
             const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
-            
             const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
             let tempUploadPaths = []; 
 
@@ -516,28 +550,24 @@
                     const { data: { user } } = await db.auth.getUser();
                     const userId = user ? user.id : 'anon';
                     
-                    // --- 🔴 修改区域开始：严厉的上传错误检查 ---
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
                             const blob = base64ToBlob(base64Data, 'image/png');
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
                             
-                            // 1. 获取上传结果，显式检查 error
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
-                            if (uploadError) throw uploadError; // 关键：手动抛出错误，触发 catch
+                            if (uploadError) throw uploadError; 
 
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
                         } catch (e) { 
-                            // 2. 捕获错误，弹窗并停车
                             console.error("上传出错:", e);
                             alert("参考图上传失败！请检查网络或图片大小（不要超过50MB）。");
                             throw new Error("已强制中止生成"); 
                         }
                     }));
-                    // --- 🔴 修改区域结束 ---
 
                     if (aspectStr === "original") {
                         try {
@@ -590,7 +620,6 @@
                 
                 if(paintData.error) throw new Error(paintData.error.message);
                 
-                // --- 结果处理优化 ---
                 const rawB64 = paintData.data?.[0]?.b64_json;
                 const urlData = paintData.data?.[0]?.url;
 
@@ -604,9 +633,7 @@
                     let finalSrcForDisplay;
 
                     if (rawB64) {
-                        // 1. 如果有 Base64，用增强版工具转 Blob（自动去头去空格）
                         imgBlob = base64ToBlob(rawB64, 'image/png');
-                        // 2. 构造显示用的 SRC，如果 API 没给头，我们自己加
                         finalSrcForDisplay = rawB64.startsWith('data:') ? rawB64 : `data:image/png;base64,${rawB64}`;
                     } else {
                         const imgRes = await fetch(urlData);
@@ -635,7 +662,6 @@
                     
                 } catch (err) {
                     console.warn("转存失败:", err);
-                    // 即使云端失败，尝试用本地数据兜底显示
                     let fallbackSrc = urlData;
                     if(rawB64) {
                          fallbackSrc = rawB64.startsWith('data:') ? rawB64 : `data:image/png;base64,${rawB64}`;
@@ -647,14 +673,16 @@
 
             } catch (e) {
                 console.error(e);
-                refundCredits(); 
+                // 发生错误时，这里不再自动退分了
+                // 因为积分是在数据库里扣的，如果要退分，还需要写一个 increment_credits 的 SQL 函数
+                // 暂时简单处理：提示用户联系管理员退分
                 
                 if (e.name === 'AbortError') { 
-                    resetUI_AbortOrError('🚫 已中止生成 (积分已退回)');
+                    resetUI_AbortOrError('🚫 已中止生成');
                 } else {
                     let msg = e.message;
                     if (msg.includes("Failed to fetch")) msg = "网络连接失败";
-                    resetUI_AbortOrError(`❌ 生成失败<br><span class="text-xs">${msg}</span><br><span class="text-xs text-green-600 font-bold">积分已退回</span>`);
+                    resetUI_AbortOrError(`❌ 生成失败<br><span class="text-xs">${msg}</span><br><span class="text-xs text-red-600 font-bold">积分已扣除，请联系管理员</span>`);
                 }
             } finally {
                 if (tempUploadPaths.length > 0) {
@@ -666,12 +694,6 @@
         }
 
         // --- 辅助功能 ---
-        function refundCredits() {
-            currentCredits += currentCost;
-            localStorage.setItem('user_credits', currentCredits);
-            updateCreditUI();
-        }
-
         async function loadGallery() { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
