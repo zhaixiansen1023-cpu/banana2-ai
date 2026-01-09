@@ -515,18 +515,30 @@
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     const { data: { user } } = await db.auth.getUser();
                     const userId = user ? user.id : 'anon';
+                    
+                    // --- 🔴 修改区域开始：严厉的上传错误检查 ---
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
                             const blob = base64ToBlob(base64Data, 'image/png');
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
-                            await db.storage.from('ai-images').upload(tempName, blob);
+                            
+                            // 1. 获取上传结果，显式检查 error
+                            const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
+                            if (uploadError) throw uploadError; // 关键：手动抛出错误，触发 catch
+
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
-                        } catch (e) { console.warn(`上传失败:`, e); }
+                        } catch (e) { 
+                            // 2. 捕获错误，弹窗并停车
+                            console.error("上传出错:", e);
+                            alert("参考图上传失败！请检查网络或图片大小（不要超过50MB）。");
+                            throw new Error("已强制中止生成"); 
+                        }
                     }));
-                    
+                    // --- 🔴 修改区域结束 ---
+
                     if (aspectStr === "original") {
                         try {
                             const img = new Image(); img.src = selectedImages[0].base64;
