@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V5.8 诊断修复版)</title>
+    <title>Z先森.AI - Pro (V6.0 终极完整无压缩版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (V5.0 原版 - 完整未压缩)
+           2. 全局样式定义 (完全展开，无压缩)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -20,7 +20,7 @@
             color: #334155; 
         }
         
-        /* 按钮特效 */
+        /* --- 按钮特效 --- */
         .btn-primary { 
             background: linear-gradient(135deg, #DB4437 0%, #C5221F 100%); 
             color: white; 
@@ -40,7 +40,7 @@
             box-shadow: none; 
         }
 
-        /* 输入框交互 */
+        /* --- 输入框交互 --- */
         .input-field { 
             transition: all 0.2s; 
             border: 1px solid #e2e8f0; 
@@ -50,7 +50,7 @@
             box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); 
         }
 
-        /* 自定义 Checkbox */
+        /* --- 自定义 Checkbox --- */
         .checkbox-custom {
             appearance: none; 
             background-color: #fff; 
@@ -84,19 +84,27 @@
             transform: scale(1); 
         }
 
-        /* 画廊网格布局 */
+        /* --- 画廊网格布局 --- */
         .gallery-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
             gap: 1rem; 
         }
         
-        /* 滚动条美化 */
-        .thin-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-        .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .thin-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+        /* --- 滚动条美化 --- */
+        .thin-scrollbar::-webkit-scrollbar { 
+            height: 6px; 
+            width: 6px; 
+        }
+        .thin-scrollbar::-webkit-scrollbar-track { 
+            background: transparent; 
+        }
+        .thin-scrollbar::-webkit-scrollbar-thumb { 
+            background-color: #cbd5e1; 
+            border-radius: 3px; 
+        }
         
-        /* 风格卡片 */
+        /* --- 风格卡片 --- */
         .style-card { 
             flex: 0 0 110px; 
             height: 64px; 
@@ -133,7 +141,7 @@
             font-weight: bold; 
         }
 
-        /* 参考图缩略图 */
+        /* --- 参考图缩略图 --- */
         .ref-thumb { 
             flex: 0 0 70px; 
             height: 70px; 
@@ -146,8 +154,14 @@
             opacity: 0.6; 
             filter: grayscale(50%); 
         }
-        .ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .ref-thumb:hover { opacity: 0.8; }
+        .ref-thumb img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
+        .ref-thumb:hover { 
+            opacity: 0.8; 
+        }
         .ref-thumb.selected { 
             border-color: #DB4437; 
             ring: 2px solid #fee2e2; 
@@ -157,47 +171,116 @@
         }
         
         .ref-number { 
-            position: absolute; top: 2px; left: 2px; 
-            background: rgba(0,0,0,0.6); color: white; 
-            width: 16px; height: 16px; border-radius: 50%; 
-            font-size: 9px; display: flex; align-items: center; 
-            justify-content: center; font-weight: bold; pointer-events: none; 
+            position: absolute; 
+            top: 2px; 
+            left: 2px; 
+            background: rgba(0,0,0,0.6); 
+            color: white; 
+            width: 16px; 
+            height: 16px; 
+            border-radius: 50%; 
+            font-size: 9px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            pointer-events: none; 
         }
         .ref-thumb .del-btn { 
-            position: absolute; top: 2px; right: 2px; 
-            background: rgba(0,0,0,0.5); color: white; 
-            width: 16px; height: 16px; border-radius: 50%; 
-            font-size: 10px; display: flex; align-items: center; 
-            justify-content: center; opacity: 0; transition: opacity 0.2s; 
+            position: absolute; 
+            top: 2px; 
+            right: 2px; 
+            background: rgba(0,0,0,0.5); 
+            color: white; 
+            width: 16px; 
+            height: 16px; 
+            border-radius: 50%; 
+            font-size: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            opacity: 0; 
+            transition: opacity 0.2s; 
         }
-        .ref-thumb:hover .del-btn { opacity: 1; }
+        .ref-thumb:hover .del-btn { 
+            opacity: 1; 
+        }
 
-        /* 上传区域 */
-        .upload-zone { border: 2px dashed #e2e8f0; transition: all 0.2s; }
-        .upload-zone:hover { border-color: #DB4437; background: #fff1f2; }
+        /* --- 上传区域 --- */
+        .upload-zone { 
+            border: 2px dashed #e2e8f0; 
+            transition: all 0.2s; 
+        }
+        .upload-zone:hover { 
+            border-color: #DB4437; 
+            background: #fff1f2; 
+        }
         
-        /* 批量选择样式 */
-        .selected-card { outline: 3px solid #DB4437; transform: scale(0.95); }
+        /* --- 批量选择样式 --- */
+        .selected-card { 
+            outline: 3px solid #DB4437; 
+            transform: scale(0.95); 
+        }
         .check-circle { 
-            position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; 
-            border-radius: 50%; background: white; border: 2px solid #ddd; 
-            display: flex; align-items: center; justify-content: center; transition: all 0.2s; 
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            width: 24px; 
+            height: 24px; 
+            border-radius: 50%; 
+            background: white; 
+            border: 2px solid #ddd; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: all 0.2s; 
         }
-        .selected-card .check-circle { background: #DB4437; border-color: #DB4437; color: white; }
+        .selected-card .check-circle { 
+            background: #DB4437; 
+            border-color: #DB4437; 
+            color: white; 
+        }
 
-        /* 画质与积分卡片 */
-        .quality-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-        .quality-card { 
-            border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 4px; 
-            cursor: pointer; text-align: center; transition: all 0.2s; background: white; 
+        /* --- 画质与积分卡片 --- */
+        .quality-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 8px; 
+            margin-top: 8px; 
         }
-        .quality-card:hover { border-color: #cbd5e1; }
-        .quality-card.active { border-color: #DB4437; background-color: #fef2f2; color: #b91c1c; }
-        .quality-name { display: block; font-weight: 800; font-size: 12px; margin-bottom: 2px; }
-        .quality-cost { font-size: 10px; color: #64748b; }
-        .quality-card.active .quality-cost { color: #b91c1c; font-weight: bold; }
+        .quality-card { 
+            border: 2px solid #e2e8f0; 
+            border-radius: 10px; 
+            padding: 10px 4px; 
+            cursor: pointer; 
+            text-align: center; 
+            transition: all 0.2s; 
+            background: white; 
+        }
+        .quality-card:hover { 
+            border-color: #cbd5e1; 
+        }
+        .quality-card.active { 
+            border-color: #DB4437; 
+            background-color: #fef2f2; 
+            color: #b91c1c; 
+        }
+        .quality-name { 
+            display: block; 
+            font-weight: 800; 
+            font-size: 12px; 
+            margin-bottom: 2px; 
+        }
+        .quality-cost { 
+            font-size: 10px; 
+            color: #64748b; 
+        }
+        .quality-card.active .quality-cost { 
+            color: #b91c1c; 
+            font-weight: bold; 
+        }
         
-        /* 积分徽章 */
+        /* --- 积分徽章 --- */
         .credit-badge { 
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); 
             color: #ffd700; 
@@ -211,15 +294,28 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
-        /* 加载更多按钮样式 */
+        /* --- 加载更多按钮样式 --- */
         .btn-load-more {
-            display: block; margin: 2rem auto; padding: 10px 30px; 
-            border: 1px solid #e2e8f0; background: white; color: #64748b; 
-            border-radius: 50px; font-weight: 600; font-size: 14px; 
-            transition: all 0.2s; cursor: pointer;
+            display: block; 
+            margin: 2rem auto; 
+            padding: 10px 30px; 
+            border: 1px solid #e2e8f0; 
+            background: white; 
+            color: #64748b; 
+            border-radius: 50px; 
+            font-weight: 600; 
+            font-size: 14px; 
+            transition: all 0.2s; 
+            cursor: pointer;
         }
-        .btn-load-more:hover { border-color: #DB4437; color: #DB4437; }
-        .btn-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-load-more:hover { 
+            border-color: #DB4437; 
+            color: #DB4437; 
+        }
+        .btn-load-more:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+        }
     </style>
 </head>
 <body class="h-screen overflow-hidden text-slate-700 bg-slate-50">
@@ -253,7 +349,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v5.8 Enterprise (上传回滚版)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.0 Enterprise (Fixed)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -290,7 +386,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.8</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.0</span>
                 </div>
             </header>
             
@@ -302,7 +398,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V5.8 稳定版)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.0 稳定垫图)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -619,7 +715,7 @@
         }
 
         // =======================================================
-        // 🚀 6.8 核心生成逻辑 V5.8 (上传逻辑回滚 V4.1 + 线性 Prompt)
+        // 🚀 V6.0 核心生成逻辑 (Linear Prompt + Robust Base64 Cleaning)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -634,6 +730,7 @@
             btn.classList.replace('btn-primary', 'bg-gray-400');
             btn.onclick = () => abortController.abort(); 
 
+            // 1. 获取 Token
             const { data: { session } } = await db.auth.getSession();
             if (!session) return alert("请重新登录");
             const token = session.access_token; 
@@ -650,7 +747,7 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 1: 上传参考图 (V5.8: 完全回滚到 V4.1 原始无盐文件名逻辑) ---
+                // --- 步骤 1: 上传参考图 (V6.0: 统一使用 base64ToBlob 清洗数据) ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     
@@ -668,42 +765,28 @@
                         else if (aspectStr === "3:4") sizeParam = "1024x1792";
                     }
 
-                    // 并发上传
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
-                            // 1. 将 Base64 转为 Blob (V4.1 原版逻辑)
-                            const base64Data = img.base64.split(',')[1];
-                            const byteCharacters = atob(base64Data);
-                            const byteNumbers = new Array(byteCharacters.length);
-                            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
-                            const byteArray = new Uint8Array(byteNumbers);
-                            const blob = new Blob([byteArray], { type: 'image/png' });
+                            // ★★★ V6.0 关键修复：使用辅助函数转 Blob，自动清洗空格和头部，防止 atob 报错 ★★★
+                            const blob = base64ToBlob(img.base64, 'image/png');
 
-                            // 2. 构造文件名 (V5.8 改回 V4.1: 去掉 randomSalt，只用 Date.now())
-                            // 注意：这里文件名必须非常短且合法，避免 Supabase 报错
+                            // V4.1 原始文件名逻辑 (Date.now())
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
                             
-                            // 3. 上传到 Supabase
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
-                            
-                            // 4. 显式捕获 Supabase 错误 (V5.8 新增诊断)
-                            if (uploadError) {
-                                throw new Error(`Supabase Upload Error: ${uploadError.message}`);
-                            }
+                            if (uploadError) throw new Error(`Supabase Upload: ${uploadError.message}`);
                             
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
-
                         } catch (e) { 
                             console.error("上传细节错误:", e);
-                            // 将具体错误抛出，以便在页面上显示
                             throw e; 
                         }
                     }));
                 }
 
-                // --- 步骤 2: 线性拼接 (V5.7 逻辑 - 稳定有效) ---
+                // --- 步骤 2: 线性拼接 (V5.7 逻辑) ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
                 
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
@@ -737,8 +820,8 @@
                 
                 let imgBlob;
                 if (json.data[0].b64_json) {
-                    const bin = atob(json.data[0].b64_json); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-                    imgBlob = new Blob([arr], {type: 'image/png'});
+                    // ★★★ V6.0 关键修复：结果处理也用 base64ToBlob 清洗，防止 AI 返回的数据带回车 ★★★
+                    imgBlob = base64ToBlob(json.data[0].b64_json, 'image/png');
                 } else {
                     const r = await fetch(json.data[0].url); imgBlob = await r.blob();
                 }
@@ -755,7 +838,6 @@
 
             } catch (e) {
                 if(e.name!=='AbortError') {
-                    // V5.8 关键：把具体的错误原因显示在页面上，而不仅仅是 alert
                     alert(`发生错误: ${e.message}`);
                     preview.innerHTML = `<span class="text-red-500 text-xs text-center block p-4">❌ ${e.message}</span>`;
                 } else {
@@ -774,13 +856,80 @@
             btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
         }
 
-        // --- 6.9 辅助工具函数 ---
-        // 杂项
-        function handleCardClick(id,url,path) { if(isSelectMode) { selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id); document.getElementById('select-count').innerText=selectedIds.size; renderGalleryGrid(Array.from(document.querySelectorAll('[id^="card-"]')).map(el=>({id:el.id.split('-')[1], image_url:el.querySelector('img').src})), false); } else openLightbox(url,id,path); }
-        function toggleSelectMode(){ isSelectMode=!isSelectMode; document.getElementById('batch-bar').classList.toggle('hidden'); loadGallery(); } 
-        async function deleteBatch(){ if(!confirm(`删 ${selectedIds.size} 张?`)) return; const ids = Array.from(selectedIds); await db.from('images').delete().in('id', ids); toggleSelectMode(); }
-        async function deleteSingle(id,p,u){if(confirm('删除?')){await db.from('images').delete().eq('id',id);if(p)await db.storage.from('ai-images').remove([p]);loadGallery();}}
-        function openLightbox(url,id,path) { currentLightboxId=id;currentLightboxPath=path;currentLightboxUrl=url;document.getElementById('lightbox').classList.remove('hidden');document.getElementById('lightbox-img').src=url;document.getElementById('lightbox-download').onclick=()=>downloadImage(url);document.getElementById('lightbox-del-btn').onclick=()=>deleteSingle(id,path,url)||closeLightbox();}
+        // --- 6.9 辅助工具函数 (V6.0 增强版：自动清洗 Base64) ---
+        function base64ToBlob(base64, mimeType) {
+            // 1. 去掉 Data URL 头 (如 data:image/png;base64,)
+            // 2. 去掉所有空格和换行符 (\s/g)，这是修复 atob 报错的关键！
+            const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
+            
+            const byteCharacters = atob(cleanBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) { 
+                byteNumbers[i] = byteCharacters.charCodeAt(i); 
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+
+        // --- 6.10 杂项 ---
+        function handleCardClick(id,url,path) { 
+            if (isSelectMode) { 
+                if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
+                const card = document.getElementById(`card-${id}`), circle = card.querySelector('.check-circle'); 
+                if (selectedIds.has(id)) { card.classList.add('selected-card'); circle.innerText = '✓'; } 
+                else { card.classList.remove('selected-card'); circle.innerText = ''; } 
+                document.getElementById('select-count').innerText = selectedIds.size;
+            } else { 
+                openLightbox(url, id, filePath); 
+            } 
+        }
+
+        function toggleSelectMode() { 
+            isSelectMode = !isSelectMode; 
+            const btn = document.getElementById('btn-batch-toggle'), bar = document.getElementById('batch-bar'); 
+            if (isSelectMode) { 
+                btn.classList.replace('bg-gray-100', 'bg-red-50'); btn.classList.replace('text-gray-600', 'text-red-600'); 
+                bar.classList.remove('hidden', 'translate-y-20'); 
+            } else { 
+                btn.classList.replace('bg-red-50', 'bg-gray-100'); btn.classList.replace('text-red-600', 'text-gray-600'); 
+                bar.classList.add('translate-y-20'); selectedIds.clear(); 
+                loadGallery(); 
+            } 
+        }
+
+        async function deleteBatch() { 
+            if (selectedIds.size === 0) return; 
+            if (!confirm(`确定删除 ${selectedIds.size} 张图片？`)) return; 
+            const idsArray = Array.from(selectedIds); 
+            const { data: files } = await db.from('images').select('file_path').in('id', idsArray); 
+            const paths = files.map(f => f.file_path).filter(p => p); 
+            if(paths.length) await db.storage.from('ai-images').remove(paths); 
+            await db.from('images').delete().in('id', idsArray); 
+            toggleSelectMode(); 
+        }
+
+        async function deleteSingle(id, filePath, url) { 
+            if (!confirm("确定删除？")) return; 
+            const el = document.getElementById(`card-${id}`); if (el) el.style.opacity = '0.3'; 
+            try { 
+                if (filePath) await db.storage.from('ai-images').remove([filePath]); 
+                const { error } = await db.from('images').delete().eq('id', id); 
+                if(error) throw error; if(el) el.remove(); 
+            } catch(e) { alert("删除失败"); if(el) el.style.opacity='1'; } 
+        }
+
+        function openLightbox(url, id, filePath) { 
+            currentLightboxId = id; currentLightboxUrl = url; currentLightboxPath = filePath;
+            document.getElementById('lightbox-img').src = url; 
+            document.getElementById('lightbox-download').onclick = () => downloadImage(url);
+            document.getElementById('lightbox').classList.remove('hidden'); 
+            document.getElementById('lightbox-del-btn').onclick = async () => { 
+                if(confirm("确定删除？")) { 
+                    try { if(filePath) await db.storage.from('ai-images').remove([filePath]); await db.from('images').delete().eq('id', id); closeLightbox(); loadGallery(); } 
+                    catch(e) { alert(e.message); } 
+                } 
+            };
+        }
         function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
         function downloadImage(url) { const a = document.createElement('a'); a.href = url; a.download = `z_ai_${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
