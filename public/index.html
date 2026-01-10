@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V5.3 Enterprise Full Fix)</title>
+    <title>Z先森.AI - Pro (V5.4 强力垫图修正版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (V4.4 原版复刻 - 未压缩)
+           2. 全局样式定义 (保持原版设计)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -253,7 +253,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v5.3 Enterprise (V4内核+修复版)</p>
+                    <p class="text-slate-400 text-sm mt-1">v5.4 Enterprise (强力垫图修正版)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -290,7 +290,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.3</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.4</span>
                 </div>
             </header>
             
@@ -302,7 +302,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V4内核 - 强力垫图)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V5.4 - 强力垫图)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -619,17 +619,13 @@
         }
 
         // =======================================================
-        // 🚀 6.8 核心生成逻辑 (V5.3 修正版：随机文件名修复缓存冲突)
+        // 🚀 6.8 核心生成逻辑 (V5.4 修正版：前置垫图 + 随机文件名)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
             const preview = document.getElementById('preview');
             
-            // 1. 积分预检
-            if (currentCredits < currentCost) {
-                alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
-                return;
-            }
+            if (currentCredits < currentCost) return alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
 
             abortController = new AbortController();
             const signal = abortController.signal;
@@ -639,11 +635,11 @@
             btn.classList.add('bg-gray-400', 'hover:bg-gray-500', 'text-white');
             btn.onclick = () => abortController.abort(); 
 
-            // 2. 获取 Token (关键安全凭证)
+            // 1. 强制获取最新 Session (防止 ID 过期)
             const { data: { session } } = await db.auth.getSession();
             if (!session) return alert("请重新登录");
             const token = session.access_token; 
-            const userId = session.user.id; // 新增：显式获取 UserID
+            const userId = session.user.id; 
 
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
@@ -652,11 +648,12 @@
             let tempUploadPaths = []; 
 
             try {
-                let finalPrompt = userPrompt;
+                // ★★★ 修正点1：初始化 prompt 为空，稍后重组 ★★★
+                let finalPrompt = ""; 
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 1: 上传参考图到 Temp 文件夹 (V5.3 修正逻辑) ---
+                // --- 步骤 2: 上传参考图 ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     
@@ -675,7 +672,7 @@
                         else if (aspectStr === "3:4") sizeParam = "1024x1792";
                     }
 
-                    // 并发上传 (★ V5.3 关键修正：添加 randomSalt 随机盐，彻底解决缓存冲突)
+                    // 并发上传 (★ V5.4: 保持随机文件名，解决缓存冲突)
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
@@ -698,37 +695,42 @@
                     }));
                 }
 
-                // --- 步骤 2: Prompt 注入 (V4.1 强力垫图逻辑) ---
-                preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (后端安全校验)...</span>';
+                // --- ★★★ 步骤 3: 构造 Prompt (V5.4 关键修正：图片前置) ★★★ ---
+                if (refImageUrls.length > 0) {
+                    preview.innerHTML = `<span class="animate-pulse text-purple-600">检测到 ${refImageUrls.length} 张图，正在注入 Prompt...</span>`;
+                    
+                    // 1. 先把 URL 放到 Prompt 的最最前面 (这是让 AI 听话的关键!)
+                    // 格式: URL URL UserPrompt --sref URL URL --iw 2
+                    finalPrompt = refImageUrls.join(" ") + " " + userPrompt;
+                    
+                    // 2. 再追加风格参数
+                    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                } else {
+                    // 没有图，直接用文字
+                    preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成 (纯文生图)...</span>';
+                    finalPrompt = userPrompt;
+                }
                 
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
                 if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
-                if (refImageUrls.length > 0) {
-                     // ★★★ V4.1 灵魂注入：同时使用风格参考和内容引用 ★★★
-                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                     refImageUrls.forEach(url => { 
-                         finalPrompt += ` (Reference Image: ${url})`; 
-                     });
-                }
-
-                const paintPayload = { 
+                const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
-                    size: sizeParam,
-                    n: 1,
+                    size: sizeParam, 
+                    n: 1, 
                     response_format: "b64_json" 
                 };
 
-                // --- 步骤 3: 发送给后端代理 (V5.0 商业级架构) ---
+                // --- 步骤 4: 发送给后端代理 ---
                 const paintRes = await fetch('/api/proxy', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}` 
                     },
-                    body: JSON.stringify(paintPayload),
+                    body: JSON.stringify(payload),
                     signal: signal 
                 });
                 
@@ -738,7 +740,7 @@
                 if (paintRes.status === 402) throw new Error("余额不足 (后端拦截)");
                 if (paintRes.status !== 200) throw new Error(json.error?.message || "生成失败");
 
-                // --- 步骤 4: 保存结果 ---
+                // --- 步骤 5: 保存结果 ---
                 const rawB64 = json.data?.[0]?.b64_json;
                 const urlData = json.data?.[0]?.url;
 
@@ -762,7 +764,10 @@
                 
                 preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
                 
-                // 刷新数据
+                // 刷新数据 & 清理 Temp
+                if (tempUploadPaths.length > 0) {
+                    await db.storage.from('ai-images').remove(tempUploadPaths);
+                }
                 fetchCredits();
                 loadGallery();
                 resetUI_Success();
@@ -776,11 +781,6 @@
                     preview.innerHTML = `❌ 失败<br><span class="text-xs text-red-500">${msg}</span>`;
                 }
                 resetUI_Success();
-            } finally {
-                // --- 步骤 5: 清理 Temp 文件 (V4.1 阅后即焚) ---
-                if (tempUploadPaths.length > 0) {
-                    db.storage.from('ai-images').remove(tempUploadPaths);
-                }
             }
         }
 
