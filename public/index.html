@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.6 反馈升级版)</title>
+    <title>Z先森.AI - Pro (V6.7 UI美化版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (V6.0 完整版 - 100% 还原)
+           2. 全局样式定义 (保持 V6.6 逻辑不变)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -20,11 +20,15 @@
             color: #334155; 
         }
         
-        /* --- 按钮特效 --- */
+        /* --- 按钮特效 (统一交互感) --- */
         .btn-primary { 
             background: linear-gradient(135deg, #DB4437 0%, #C5221F 100%); 
             color: white; 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         .btn-primary:hover { 
             transform: translateY(-2px); 
@@ -40,14 +44,29 @@
             box-shadow: none; 
         }
 
-        /* --- 输入框交互 --- */
+        /* --- 次要/危险按钮 (新增) --- */
+        .btn-ghost-danger {
+            background-color: white;
+            color: #ef4444;
+            border: 1px solid #fee2e2;
+            transition: all 0.2s;
+        }
+        .btn-ghost-danger:hover {
+            background-color: #fef2f2;
+            border-color: #ef4444;
+        }
+
+        /* --- 输入框交互 (增强质感) --- */
         .input-field { 
             transition: all 0.2s; 
             border: 1px solid #e2e8f0; 
+            background-color: white; /* 改为白色背景 */
         }
         .input-field:focus { 
             border-color: #DB4437; 
+            background-color: white;
             box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); 
+            outline: none;
         }
 
         /* --- 自定义 Checkbox --- */
@@ -349,11 +368,11 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.6 Enterprise (Feedback Edition)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.7 Enterprise (UI Pro Edition)</p>
                 </div>
                 <div class="space-y-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="••••••••"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="name@studio.com"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="••••••••"></div>
                     <div class="flex items-center justify-between mt-2">
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="remember-me" class="checkbox-custom" checked><span class="text-sm text-slate-500 font-medium select-none">记住我</span></label>
                         <button onclick="forgotPassword()" class="text-sm font-bold text-red-600 hover:text-red-700 hover:underline">忘记密码?</button>
@@ -386,7 +405,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.6</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.7</span>
                 </div>
             </header>
             
@@ -395,7 +414,7 @@
                     <div class="flex-1 overflow-y-auto p-6 space-y-5 thin-scrollbar">
                         
                         <div><label class="font-bold text-sm text-gray-700 flex justify-between mb-2"><span>风格滤镜</span><span id="style-name" class="text-xs text-red-600 font-bold">默认</span></label><div class="flex gap-3 overflow-x-auto thin-scrollbar pb-2 pt-1 px-1" id="style-container"></div></div>
-                        <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
+                        <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl input-field text-sm" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
                             <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.5 参数加强)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
@@ -453,51 +472,74 @@
 
             <div id="view-profile" class="hidden flex-1 overflow-y-auto p-8 bg-slate-50">
                 <div class="max-w-2xl mx-auto space-y-6">
-                    <h2 class="text-2xl font-bold mb-6">个人中心</h2>
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-6">
-                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-2xl">👤</div>
-                        <div>
-                            <div class="text-sm text-gray-400 uppercase font-bold">当前账号</div>
-                            <div id="profile-email" class="text-xl font-bold text-gray-800">user@email.com</div>
-                            <div class="text-xs text-gray-400 mt-1">ID: <span id="profile-id">...</span></div>
-                            <div class="text-xs text-gray-400 mt-1">剩余积分: <span id="profile-credits-text" class="font-bold text-red-600">--</span></div>
+                    <h2 class="text-2xl font-black text-slate-800 tracking-tight mb-8">个人中心</h2>
+                    
+                    <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex items-center gap-6">
+                        <div class="w-20 h-20 bg-gradient-to-br from-red-50 to-red-100 rounded-full flex items-center justify-center text-3xl shadow-inner border border-red-100">
+                            👤
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">PRO Account</span>
+                            </div>
+                            <div id="profile-email" class="text-2xl font-bold text-slate-900 tracking-tight mb-1">user@email.com</div>
+                            <div class="flex items-center gap-4 text-sm">
+                                <span class="text-slate-400 font-mono text-xs">ID: <span id="profile-id">...</span></span>
+                                <div class="flex items-center gap-1 text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md">
+                                    <span>💎</span> <span id="profile-credits-text">--</span> 积分
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🔐 安全设置</h3>
+                    <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold mb-6 flex items-center gap-2 text-slate-800">
+                            <span class="w-1 h-6 bg-red-600 rounded-full block"></span>🔐 安全设置
+                        </h3>
                         <div class="space-y-4">
-                            <div><label class="text-xs font-bold text-gray-500">修改密码</label><input type="password" id="new-password" class="input-field w-full mt-1 p-3 rounded-lg text-sm bg-gray-50" placeholder="输入新密码 (至少6位)"></div>
-                            <button onclick="updatePassword()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-black transition">更新密码</button>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 mb-2 block uppercase tracking-wide">修改密码</label>
+                                <input type="password" id="new-password" class="input-field w-full p-4 rounded-xl text-sm" placeholder="输入新密码 (至少6位)">
+                            </div>
+                            <button onclick="updatePassword()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">
+                                🔒 更新密码
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">📝 意见反馈</h3>
-                        <p class="text-xs text-gray-500 mb-4">帮助我们做得更好！遇到的 Bug 或功能建议都可以写在这里。</p>
+                    <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold flex items-center gap-2 text-slate-800">
+                                <span class="w-1 h-6 bg-red-600 rounded-full block"></span>📝 意见反馈
+                            </h3>
+                            <p class="text-sm text-slate-400 mt-1 pl-3">帮助我们做得更好！遇到的 Bug 或功能建议都可以写在这里。</p>
+                        </div>
                         
                         <div class="space-y-4">
                             <div>
-                                <textarea id="feedback-content" rows="4" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="请详细描述你的建议，或者是遇到的 Bug..."></textarea>
+                                <textarea id="feedback-content" rows="4" class="input-field w-full p-4 rounded-xl text-sm resize-none" placeholder="请详细描述你的建议，或者是遇到的 Bug..."></textarea>
                             </div>
                             <div>
-                                <input type="text" id="feedback-contact" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="联系方式 (微信/Email，选填)">
+                                <input type="text" id="feedback-contact" class="input-field w-full p-4 rounded-xl text-sm" placeholder="联系方式 (微信/Email，选填)">
                             </div>
-                            <button id="btn-submit-feedback" onclick="submitFeedback()" class="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition shadow-md flex items-center gap-2">
+                            <button id="btn-submit-feedback" onclick="submitFeedback()" class="w-full btn-primary py-3 rounded-xl font-bold shadow-md">
                                 🚀 提交反馈
                             </button>
                         </div>
                     </div>
-                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                         <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
-                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span><button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
+
+                    <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex items-center justify-between">
+                         <div>
+                            <h3 class="text-lg font-bold text-slate-800 mb-1">🛠️ 系统工具</h3>
+                            <p class="text-xs text-slate-400">清除本地缓存 (API Keys/Settings) 如遇故障可尝试</p>
                          </div>
+                         <button onclick="clearKeys()" class="btn-ghost-danger px-4 py-2 rounded-lg text-sm font-bold">
+                            🗑️ 清除缓存
+                         </button>
                     </div>
                 </div>
             </div>
-
-        </main>
+            </main>
     </div>
 
     <script>
