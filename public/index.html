@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.1 强力指令版)</title>
+    <title>Z先森.AI - Pro (V6.3 完整参数加强版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (完全展开，无压缩)
+           2. 全局样式定义 (V6.0 完整版 - 100% 还原)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -349,7 +349,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.1 Enterprise (强力指令版)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.3 Enterprise (Shotgun Params)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -386,7 +386,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.1</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.3</span>
                 </div>
             </header>
             
@@ -398,7 +398,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.1 强力指令)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.3 参数加强)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -613,7 +613,7 @@
         function handleImageUpload(input) { 
             const files = Array.from(input.files); 
             if (!files.length) return; 
-            if (refImages.length + files.length > 10) return alert("最多只能上传10张参考图！"); 
+            if (refImages.length + files.length > 10) return alert("最多10张参考图！"); 
             files.forEach(file => { 
                 const reader = new FileReader(); 
                 reader.onload = (e) => { 
@@ -715,7 +715,7 @@
         }
 
         // =======================================================
-        // 🚀 V6.1 核心生成逻辑 (强力指令 + 线性拼接)
+        // 🚀 V6.3 核心生成逻辑 (Linear Prompt + Multi-Params Injection)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -747,7 +747,7 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 1: 上传参考图 (V6.0 稳定逻辑) ---
+                // --- 步骤 1: 上传参考图 (V6.0: 统一使用 base64ToBlob 清洗数据) ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     
@@ -767,7 +767,10 @@
 
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
+                            // ★ 使用 base64ToBlob 清洗
                             const blob = base64ToBlob(img.base64, 'image/png');
+
+                            // V4.1 原始文件名逻辑 (Date.now())
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
                             
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
@@ -783,32 +786,34 @@
                     }));
                 }
 
-                // --- 步骤 2: 线性拼接 (★★ V6.1 强力指令改进 ★★) ---
+                // --- 步骤 2: 线性拼接 (V4.1 原版逻辑 - 你说效果最好的那个) ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
                 
-                // 1. 追加风格滤镜
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                
-                // 2. 追加画质参数
-                if (selectedQuality !== '1k') finalPrompt += ", 4k resolution, highly detailed architectural photograph";
+                if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
+                if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
-                // 3. ★★★ 关键修改：用强硬的自然语言命令替代软性的参数 ★★★
                 if (refImageUrls.length > 0) {
-                     // 不再使用 --sref，改用明确的指令
-                     finalPrompt += `. \n\n--- IMPORTANT INSTRUCTION ---\n`;
-                     finalPrompt += `You MUST strictly adhere to the architectural style, material palette, lighting, and composition presented in the following reference images: `;
-                     finalPrompt += refImageUrls.join(", ");
-                     finalPrompt += `. The final image must perfectly match the visual aesthetic of these references.`;
+                     // 经典的线性追加，不做花哨修改
+                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                     refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
+                // --- ★★★ 步骤 3: 暴力参数注入 (V6.3 核心改动) ★★★ ---
+                // 不管后端要哪个字段，我们全给它！这能解决 Prompt 里图片被忽略的问题。
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: sizeParam, 
-                    n: 1 
+                    n: 1,
+                    // 1. 标准 OpenAI 字段
+                    image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
+                    // 2. 简易接口字段
+                    image: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
+                    // 3. 某些定制接口字段
+                    ref_image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined
                 };
 
-                // --- 步骤 3: 发送请求 ---
                 const res = await fetch('/api/proxy', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(payload), signal: signal 
@@ -858,9 +863,12 @@
             btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
         }
 
-        // --- 6.9 辅助工具函数 (V6.0 稳定版) ---
+        // --- 6.9 辅助工具函数 (V6.0 增强版：自动清洗 Base64) ---
         function base64ToBlob(base64, mimeType) {
+            // 1. 去掉 Data URL 头 (如 data:image/png;base64,)
+            // 2. 去掉所有空格和换行符 (\s/g)，这是修复 atob 报错的关键！
             const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
+            
             const byteCharacters = atob(cleanBase64);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) { 
