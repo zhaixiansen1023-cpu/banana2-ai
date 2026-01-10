@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V5.2 Enterprise Full)</title>
+    <title>Z先森.AI - Pro (V5.3 Enterprise Full Fix)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (V4.4 原版复刻)
+           2. 全局样式定义 (V4.4 原版复刻 - 未压缩)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -211,7 +211,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
-        /* [V5.0 新增] 加载更多按钮样式 */
+        /* 加载更多按钮样式 */
         .btn-load-more {
             display: block; margin: 2rem auto; padding: 10px 30px; 
             border: 1px solid #e2e8f0; background: white; color: #64748b; 
@@ -253,7 +253,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v5.2 Enterprise (V4内核)</p>
+                    <p class="text-slate-400 text-sm mt-1">v5.3 Enterprise (V4内核+修复版)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -290,7 +290,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.2</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.3</span>
                 </div>
             </header>
             
@@ -414,12 +414,12 @@
         let currentStylePrompt = ""; 
         let abortController = null; 
 
-        // 积分系统变量 (UI显示用)
+        // 积分系统变量
         let currentCredits = 0;
         let selectedQuality = '1k'; 
         let currentCost = 5;       
 
-        // 分页系统变量 (V5.0)
+        // 分页系统变量
         let currentPage = 0; 
         const PAGE_SIZE = 20; 
         let hasMoreImages = true;
@@ -619,7 +619,7 @@
         }
 
         // =======================================================
-        // 🚀 6.8 核心生成逻辑 (双重架构：V5后端 + V4内核) 🚀
+        // 🚀 6.8 核心生成逻辑 (V5.3 修正版：随机文件名修复缓存冲突)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -643,6 +643,7 @@
             const { data: { session } } = await db.auth.getSession();
             if (!session) return alert("请重新登录");
             const token = session.access_token; 
+            const userId = session.user.id; // 新增：显式获取 UserID
 
             let userPrompt = document.getElementById('prompt').value; 
             const aspectStr = document.getElementById('aspect').value; 
@@ -655,10 +656,9 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 1: 上传参考图到 Temp 文件夹 (V4.1 核心逻辑) ---
+                // --- 步骤 1: 上传参考图到 Temp 文件夹 (V5.3 修正逻辑) ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
-                    const userId = session.user.id;
                     
                     // V4.1 智能比例检测
                     if (aspectStr === "original") {
@@ -675,14 +675,19 @@
                         else if (aspectStr === "3:4") sizeParam = "1024x1792";
                     }
 
-                    // 并发上传
+                    // 并发上传 (★ V5.3 关键修正：添加 randomSalt 随机盐，彻底解决缓存冲突)
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
                             const base64Data = img.base64.split(',')[1];
                             const blob = base64ToBlob(base64Data, 'image/png');
-                            const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
+                            
+                            // 生成 6位随机字符，保证文件名绝对唯一
+                            const randomSalt = Math.random().toString(36).substring(2, 8);
+                            const tempName = `temp/${userId}/${Date.now()}_${randomSalt}_${index}.png`;
+                            
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
                             if (uploadError) throw uploadError; 
+                            
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
