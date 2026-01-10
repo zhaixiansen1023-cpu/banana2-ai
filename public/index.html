@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.5 画廊修复版)</title>
+    <title>Z先森.AI - Pro (V6.6 反馈升级版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -349,7 +349,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.5 Enterprise (Gallery Fixed)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.6 Enterprise (Feedback Edition)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -386,7 +386,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.5</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.6</span>
                 </div>
             </header>
             
@@ -473,6 +473,22 @@
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">📝 意见反馈</h3>
+                        <p class="text-xs text-gray-500 mb-4">帮助我们做得更好！遇到的 Bug 或功能建议都可以写在这里。</p>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <textarea id="feedback-content" rows="4" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="请详细描述你的建议，或者是遇到的 Bug..."></textarea>
+                            </div>
+                            <div>
+                                <input type="text" id="feedback-contact" class="input-field w-full p-3 rounded-lg text-sm bg-gray-50" placeholder="联系方式 (微信/Email，选填)">
+                            </div>
+                            <button id="btn-submit-feedback" onclick="submitFeedback()" class="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition shadow-md flex items-center gap-2">
+                                🚀 提交反馈
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                          <h3 class="text-lg font-bold mb-4 flex items-center gap-2">🛠️ 系统工具</h3>
                          <div class="flex items-center justify-between">
                             <span class="text-sm text-gray-600">清除本地缓存 (API Keys/Settings)</span><button onclick="clearKeys()" class="text-red-500 text-sm hover:underline">清除缓存</button>
@@ -513,7 +529,7 @@
         // 积分系统变量
         let currentCredits = 0;
         let selectedQuality = '1k'; 
-        let currentCost = 5;       
+        let currentCost = 5;        
 
         // 分页系统变量
         let currentPage = 0; 
@@ -791,8 +807,8 @@
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
                 if (refImageUrls.length > 0) {
-                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                     refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
+                      finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                      refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
                 // --- ★★★ 步骤 3: 暴力参数注入 (V6.3) ★★★ ---
@@ -879,7 +895,6 @@
                 else { card.classList.remove('selected-card'); circle.innerText = ''; } 
                 document.getElementById('select-count').innerText = selectedIds.size;
             } else { 
-                // ★ 关键修复：这里的第三个参数必须是 path，不能是 filePath (V6.5 Fix)
                 openLightbox(url, id, path); 
             } 
         }
@@ -921,7 +936,6 @@
         function openLightbox(url, id, filePath) { 
             currentLightboxId = id; currentLightboxUrl = url; currentLightboxPath = filePath;
             document.getElementById('lightbox-img').src = url; 
-            // 绑定下载事件
             document.getElementById('lightbox-download').onclick = () => downloadImage(url);
             document.getElementById('lightbox').classList.remove('hidden'); 
             document.getElementById('lightbox-del-btn').onclick = async () => { 
@@ -952,6 +966,50 @@
         }
         
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
+
+        // --- 6.11 意见反馈逻辑 (V6.6 新增) ---
+        async function submitFeedback() {
+            const btn = document.getElementById('btn-submit-feedback');
+            const contentInput = document.getElementById('feedback-content');
+            const contactInput = document.getElementById('feedback-contact');
+            
+            const content = contentInput.value.trim();
+            const contact = contactInput.value.trim();
+
+            if (!content) {
+                alert("请先写点内容再提交哦");
+                return;
+            }
+
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "🔄 提交中...";
+            btn.disabled = true;
+
+            try {
+                const { data: { user } } = await db.auth.getUser();
+
+                const { error } = await db
+                    .from('feedback')
+                    .insert({
+                        content: content,
+                        contact: contact,
+                        user_id: user ? user.id : null 
+                    });
+
+                if (error) throw error;
+
+                alert("✅ 反馈提交成功，感谢你的建议！");
+                contentInput.value = '';
+                contactInput.value = '';
+
+            } catch (err) {
+                console.error('Feedback Error:', err);
+                alert("提交失败：" + (err.message || "未知错误"));
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
