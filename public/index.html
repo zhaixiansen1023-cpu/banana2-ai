@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V5.7 最终完整版)</title>
+    <title>Z先森.AI - Pro (V5.8 诊断修复版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           2. 全局样式定义 (V5.3 原版 - 完整未压缩)
+           2. 全局样式定义 (V5.0 原版 - 完整未压缩)
            ========================================= */
         body { 
             background-color: #f8fafc; 
@@ -253,7 +253,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v5.7 Enterprise (Full Linear Logic)</p>
+                    <p class="text-slate-400 text-sm mt-1">v5.8 Enterprise (上传回滚版)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -290,7 +290,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.7</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V5.8</span>
                 </div>
             </header>
             
@@ -302,7 +302,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V5.7 - 线性垫图)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V5.8 稳定版)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -619,7 +619,7 @@
         }
 
         // =======================================================
-        // 🚀 6.8 核心生成逻辑 (V5.7: V5.3架构 + V4.1线性逻辑)
+        // 🚀 6.8 核心生成逻辑 V5.8 (上传逻辑回滚 V4.1 + 线性 Prompt)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -631,11 +631,9 @@
             const signal = abortController.signal;
 
             btn.innerText = "🛑 停止生成 (后端处理中)";
-            btn.classList.remove('btn-primary');
-            btn.classList.add('bg-gray-400', 'hover:bg-gray-500', 'text-white');
+            btn.classList.replace('btn-primary', 'bg-gray-400');
             btn.onclick = () => abortController.abort(); 
 
-            // 1. 获取 Token
             const { data: { session } } = await db.auth.getSession();
             if (!session) return alert("请重新登录");
             const token = session.access_token; 
@@ -648,14 +646,11 @@
             let tempUploadPaths = []; 
 
             try {
-                // ★★★ V5.7 核心修复：完全回归 V4.1 线性拼接逻辑 ★★★
-                // 严禁使用 if/else 分叉，必须按顺序拼接！
-                
-                let finalPrompt = userPrompt; // 1. 先放用户 Prompt
+                let finalPrompt = userPrompt; 
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 2: 上传参考图 (保留随机盐) ---
+                // --- 步骤 1: 上传参考图 (V5.8: 完全回滚到 V4.1 原始无盐文件名逻辑) ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     
@@ -676,49 +671,58 @@
                     // 并发上传
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
+                            // 1. 将 Base64 转为 Blob (V4.1 原版逻辑)
                             const base64Data = img.base64.split(',')[1];
-                            const blob = base64ToBlob(base64Data, 'image/png');
-                            const randomSalt = Math.random().toString(36).substring(2, 8); // 随机盐
-                            const tempName = `temp/${userId}/${Date.now()}_${randomSalt}_${index}.png`;
+                            const byteCharacters = atob(base64Data);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: 'image/png' });
+
+                            // 2. 构造文件名 (V5.8 改回 V4.1: 去掉 randomSalt，只用 Date.now())
+                            // 注意：这里文件名必须非常短且合法，避免 Supabase 报错
+                            const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
                             
+                            // 3. 上传到 Supabase
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
-                            if (uploadError) throw uploadError; 
+                            
+                            // 4. 显式捕获 Supabase 错误 (V5.8 新增诊断)
+                            if (uploadError) {
+                                throw new Error(`Supabase Upload Error: ${uploadError.message}`);
+                            }
                             
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
-                        } catch (e) { throw new Error("参考图上传失败"); }
+
+                        } catch (e) { 
+                            console.error("上传细节错误:", e);
+                            // 将具体错误抛出，以便在页面上显示
+                            throw e; 
+                        }
                     }));
                 }
 
-                // --- 步骤 3: 线性拼接 (V4.1 原汁原味) ---
-                // 不管有没有图，这些参数都按顺序加在后面
+                // --- 步骤 2: 线性拼接 (V5.7 逻辑 - 稳定有效) ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
                 
-                // 2. 追加风格
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                
-                // 3. 追加画质
                 if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
-                // 4. 追加图片 (关键：放在最后！)
                 if (refImageUrls.length > 0) {
                      finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                     refImageUrls.forEach(url => { 
-                         finalPrompt += ` (Reference Image: ${url})`; 
-                     });
+                     refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: sizeParam, 
-                    n: 1, 
-                    response_format: "b64_json" 
+                    n: 1 
                 };
 
-                // --- 步骤 4: 发送请求 ---
+                // --- 步骤 3: 发送请求 ---
                 const res = await fetch('/api/proxy', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(payload), signal: signal 
@@ -728,15 +732,19 @@
                 if (res.status === 402) throw new Error("余额不足 (后端拦截)");
                 if (res.status !== 200) throw new Error(json.error?.message || "生成失败");
 
-                // --- 步骤 5: 保存结果 ---
-                preview.innerHTML = '<span class="animate-pulse text-green-600">正在保存...</span>';
+                // --- 步骤 4: 保存结果 ---
+                preview.innerHTML = '<span class="text-green-600">保存中...</span>';
                 
                 let imgBlob;
-                if (json.data[0].b64_json) imgBlob = base64ToBlob(json.data[0].b64_json, 'image/png');
-                else { const r = await fetch(json.data[0].url); imgBlob = await r.blob(); }
+                if (json.data[0].b64_json) {
+                    const bin = atob(json.data[0].b64_json); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+                    imgBlob = new Blob([arr], {type: 'image/png'});
+                } else {
+                    const r = await fetch(json.data[0].url); imgBlob = await r.blob();
+                }
 
                 const path = `${session.user.id}/${Date.now()}.png`;
-                await db.storage.from('ai-images').upload(path, imgBlob, { contentType: 'image/png', upsert: true });
+                await db.storage.from('ai-images').upload(path, imgBlob, { contentType: 'image/png' });
                 const {data:{publicUrl}} = db.storage.from('ai-images').getPublicUrl(path);
                 await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: publicUrl, file_path: path });
                 
@@ -746,8 +754,13 @@
                 fetchCredits(); loadGallery(); resetUI_Success();
 
             } catch (e) {
-                if(e.name!=='AbortError') alert(e.message);
-                preview.innerHTML = '<span class="text-gray-400">失败</span>';
+                if(e.name!=='AbortError') {
+                    // V5.8 关键：把具体的错误原因显示在页面上，而不仅仅是 alert
+                    alert(`发生错误: ${e.message}`);
+                    preview.innerHTML = `<span class="text-red-500 text-xs text-center block p-4">❌ ${e.message}</span>`;
+                } else {
+                    preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
+                }
                 resetUI_Success();
             }
         }
@@ -762,16 +775,14 @@
         }
 
         // --- 6.9 辅助工具函数 ---
-        function base64ToBlob(base64, type) { const bin = atob(b64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '')); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr], {type}); }
-        function downloadImage(url) { const a = document.createElement('a'); a.href = url; a.download = `z_ai_${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
-        
-        // --- 6.10 杂项 ---
+        // 杂项
         function handleCardClick(id,url,path) { if(isSelectMode) { selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id); document.getElementById('select-count').innerText=selectedIds.size; renderGalleryGrid(Array.from(document.querySelectorAll('[id^="card-"]')).map(el=>({id:el.id.split('-')[1], image_url:el.querySelector('img').src})), false); } else openLightbox(url,id,path); }
         function toggleSelectMode(){ isSelectMode=!isSelectMode; document.getElementById('batch-bar').classList.toggle('hidden'); loadGallery(); } 
         async function deleteBatch(){ if(!confirm(`删 ${selectedIds.size} 张?`)) return; const ids = Array.from(selectedIds); await db.from('images').delete().in('id', ids); toggleSelectMode(); }
         async function deleteSingle(id,p,u){if(confirm('删除?')){await db.from('images').delete().eq('id',id);if(p)await db.storage.from('ai-images').remove([p]);loadGallery();}}
         function openLightbox(url,id,path) { currentLightboxId=id;currentLightboxPath=path;currentLightboxUrl=url;document.getElementById('lightbox').classList.remove('hidden');document.getElementById('lightbox-img').src=url;document.getElementById('lightbox-download').onclick=()=>downloadImage(url);document.getElementById('lightbox-del-btn').onclick=()=>deleteSingle(id,path,url)||closeLightbox();}
         function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
+        function downloadImage(url) { const a = document.createElement('a'); a.href = url; a.download = `z_ai_${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
     </script>
 </body>
