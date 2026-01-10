@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.3 完整参数加强版)</title>
+    <title>Z先森.AI - Pro (V6.4 画廊修复版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -349,7 +349,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.3 Enterprise (Shotgun Params)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.4 Enterprise (Gallery Fix)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -386,7 +386,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.3</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.4</span>
                 </div>
             </header>
             
@@ -398,7 +398,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.3 参数加强)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.4 完美生成)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -645,7 +645,7 @@
         function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
         function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
 
-        // --- 6.7 分页画廊加载 (V5.0) ---
+        // --- 6.7 分页画廊加载 (V6.3 逻辑 - 修复点击ID问题) ---
         async function loadGallery(reset = true) { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
@@ -692,7 +692,7 @@
 
         function renderGalleryGrid(data, append = false) { 
             const html = data.map(img => `
-                <div id="card-${img.id}" class="bg-white rounded overflow-hidden shadow group relative border border-gray-100 cursor-pointer transition-all" onclick="handleCardClick(${img.id}, '${img.image_url}', '${img.file_path||''}')">
+                <div id="card-${img.id}" class="bg-white rounded overflow-hidden shadow group relative border border-gray-100 cursor-pointer transition-all" onclick="handleCardClick('${img.id}', '${img.image_url}', '${img.file_path||''}')">
                     <div class="aspect-square relative">
                         <img src="${img.image_url}" class="w-full h-full object-cover">
                         <div class="normal-overlay absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100 ${isSelectMode ? 'hidden' : ''}">
@@ -715,7 +715,7 @@
         }
 
         // =======================================================
-        // 🚀 V6.3 核心生成逻辑 (Linear Prompt + Multi-Params Injection)
+        // 🚀 V6.3 核心生成逻辑 (饱和式参数攻击 - 保持不变)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -747,7 +747,7 @@
                 let refImageUrls = []; 
                 let sizeParam = "1024x1024"; 
 
-                // --- 步骤 1: 上传参考图 (V6.0: 统一使用 base64ToBlob 清洗数据) ---
+                // --- 步骤 1: 上传参考图 ---
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传 ${selectedImages.length} 张参考图...</span>`;
                     
@@ -767,7 +767,7 @@
 
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
-                            // ★ 使用 base64ToBlob 清洗
+                            // ★ 使用 base64ToBlob 清洗 (V6.0 增强)
                             const blob = base64ToBlob(img.base64, 'image/png');
 
                             // V4.1 原始文件名逻辑 (Date.now())
@@ -786,7 +786,7 @@
                     }));
                 }
 
-                // --- 步骤 2: 线性拼接 (V4.1 原版逻辑 - 你说效果最好的那个) ---
+                // --- 步骤 2: 线性拼接 (V4.1 原版逻辑) ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
                 
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
@@ -794,13 +794,11 @@
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
                 if (refImageUrls.length > 0) {
-                     // 经典的线性追加，不做花哨修改
                      finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
                      refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
-                // --- ★★★ 步骤 3: 暴力参数注入 (V6.3 核心改动) ★★★ ---
-                // 不管后端要哪个字段，我们全给它！这能解决 Prompt 里图片被忽略的问题。
+                // --- ★★★ 步骤 3: 暴力参数注入 (V6.3) ★★★ ---
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
@@ -863,12 +861,9 @@
             btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
         }
 
-        // --- 6.9 辅助工具函数 (V6.0 增强版：自动清洗 Base64) ---
+        // --- 6.9 辅助工具函数 ---
         function base64ToBlob(base64, mimeType) {
-            // 1. 去掉 Data URL 头 (如 data:image/png;base64,)
-            // 2. 去掉所有空格和换行符 (\s/g)，这是修复 atob 报错的关键！
             const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
-            
             const byteCharacters = atob(cleanBase64);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) { 
@@ -878,7 +873,7 @@
             return new Blob([byteArray], { type: mimeType });
         }
 
-        // --- 6.10 杂项 ---
+        // --- 6.10 杂项 & 修复下载/画廊 ---
         function handleCardClick(id,url,path) { 
             if (isSelectMode) { 
                 if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
@@ -928,6 +923,7 @@
         function openLightbox(url, id, filePath) { 
             currentLightboxId = id; currentLightboxUrl = url; currentLightboxPath = filePath;
             document.getElementById('lightbox-img').src = url; 
+            // 修复下载点击绑定
             document.getElementById('lightbox-download').onclick = () => downloadImage(url);
             document.getElementById('lightbox').classList.remove('hidden'); 
             document.getElementById('lightbox-del-btn').onclick = async () => { 
@@ -938,7 +934,26 @@
             };
         }
         function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
-        function downloadImage(url) { const a = document.createElement('a'); a.href = url; a.download = `z_ai_${Date.now()}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+        
+        // 强力下载修复：使用 Fetch Blob 解决跨域/下载失败问题
+        async function downloadImage(url) { 
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); 
+                a.href = blobUrl; 
+                a.download = `z_ai_${Date.now()}.png`; 
+                document.body.appendChild(a); 
+                a.click(); 
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.warn("Blob download failed, trying direct link", e);
+                window.open(url, '_blank');
+            }
+        }
+        
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
     </script>
 </body>
