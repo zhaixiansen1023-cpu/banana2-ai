@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.7 UI美化版)</title>
+    <title>Z先森.AI - Pro (V6.8 终极UI重构版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -61,12 +61,20 @@
             transition: all 0.2s; 
             border: 1px solid #e2e8f0; 
             background-color: white; /* 改为白色背景 */
+            appearance: none; /* V6.8新增: 去除默认下拉箭头 */
         }
         .input-field:focus { 
             border-color: #DB4437; 
             background-color: white;
             box-shadow: 0 0 0 4px rgba(219, 68, 55, 0.1); 
             outline: none;
+        }
+
+        /* V6.8新增: 自定义 Select 箭头 */
+        .select-wrapper { position: relative; }
+        .select-wrapper::after {
+            content: "▼"; font-size: 10px; color: #94a3b8; 
+            position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none;
         }
 
         /* --- 自定义 Checkbox --- */
@@ -123,29 +131,42 @@
             border-radius: 3px; 
         }
         
-        /* --- 风格卡片 --- */
+        /* --- V6.8 重构: 风格卡片 (支持背景图) --- */
         .style-card { 
-            flex: 0 0 110px; 
-            height: 64px; 
+            flex: 0 0 120px; 
+            height: 70px; /* 加大尺寸 */
             border-radius: 12px; 
             position: relative; 
             cursor: pointer; 
             border: 2px solid transparent; 
-            transition: all 0.2s; 
+            transition: all 0.3s; 
             overflow: hidden; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-size: cover; 
+            background-position: center;
+        }
+        /* 黑色半透明遮罩，保证文字清晰 */
+        .style-card::before {
+            content: ""; position: absolute; inset: 0; 
+            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.2)); 
+            z-index: 1; transition: all 0.3s;
         }
         .style-card span { 
             position: relative; 
             z-index: 10; 
             color: white; 
-            font-size: 12px; 
-            font-weight: 800; 
-            text-shadow: 0 1px 3px rgba(0,0,0,0.3); 
+            font-size: 13px; 
+            font-weight: 700; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8); 
+            width: 100%; 
+            height: 100%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
         }
+        .style-card:hover { transform: translateY(-2px); }
+        .style-card:hover::before { background: rgba(0,0,0,0.4); } 
+        
         .style-card.active { 
             border-color: #DB4437; 
             transform: scale(0.98); 
@@ -158,6 +179,14 @@
             color: white; 
             font-size: 10px; 
             font-weight: bold; 
+            z-index: 20; 
+            background: #DB4437; 
+            width: 16px; 
+            height: 16px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
         }
 
         /* --- 参考图缩略图 --- */
@@ -260,17 +289,11 @@
             color: white; 
         }
 
-        /* --- 画质与积分卡片 --- */
-        .quality-grid { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 8px; 
-            margin-top: 8px; 
-        }
+        /* --- V6.8 重构: 画质与积分卡片 --- */
         .quality-card { 
-            border: 2px solid #e2e8f0; 
-            border-radius: 10px; 
-            padding: 10px 4px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
+            padding: 12px 8px; 
             cursor: pointer; 
             text-align: center; 
             transition: all 0.2s; 
@@ -278,11 +301,13 @@
         }
         .quality-card:hover { 
             border-color: #cbd5e1; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
         }
         .quality-card.active { 
             border-color: #DB4437; 
             background-color: #fef2f2; 
             color: #b91c1c; 
+            ring: 1px solid #DB4437; /* 新增选中外圈 */
         }
         .quality-name { 
             display: block; 
@@ -368,7 +393,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.7 Enterprise (UI Pro Edition)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.8 Enterprise (UI Refactored)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -405,57 +430,79 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.7</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.8</span>
                 </div>
             </header>
             
             <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
                 <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
-                    <div class="flex-1 overflow-y-auto p-6 space-y-5 thin-scrollbar">
-                        
-                        <div><label class="font-bold text-sm text-gray-700 flex justify-between mb-2"><span>风格滤镜</span><span id="style-name" class="text-xs text-red-600 font-bold">默认</span></label><div class="flex gap-3 overflow-x-auto thin-scrollbar pb-2 pt-1 px-1" id="style-container"></div></div>
-                        <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl input-field text-sm" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
-                        
-                        <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.5 参数加强)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
-                            <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
-                            <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="text-xs font-bold text-gray-500">比例</label>
-                                <select id="aspect" class="w-full mt-1 p-2 border rounded-lg text-sm bg-white">
-                                    <option value="original">📐 按原图 (Auto)</option>
-                                    <option value="1:1">1:1 (正方)</option>
-                                    <option value="16:9">16:9 (横屏)</option>
-                                    <option value="3:4">3:4 (竖屏)</option>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label class="text-xs font-bold text-gray-500">出图质量 & 积分</label>
-                            </div>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-8 thin-scrollbar"> <div>
+                            <label class="font-bold text-sm text-slate-800 flex justify-between mb-3 items-center">
+                                <span>风格滤镜</span>
+                                <span id="style-name" class="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded">默认</span>
+                            </label>
+                            <div class="flex gap-3 overflow-x-auto thin-scrollbar pb-3 -mx-1 px-1" id="style-container"></div>
                         </div>
 
-                        <div class="quality-grid">
-                            <div class="quality-card active" onclick="selectQuality('1k', 5, this)">
-                                <span class="quality-name">标准 (1k)</span>
-                                <span class="quality-cost">- 5 积分</span>
+                        <div>
+                            <label class="font-bold text-sm text-slate-800 mb-2 block">设计指令 (Prompt)</label>
+                            <textarea id="prompt" rows="3" class="input-field w-full p-4 rounded-xl text-sm leading-relaxed" placeholder="描述你的建筑灵感：例如一个悬崖上的现代美术馆，黄昏时刻，玻璃幕墙反射着落日余晖..."></textarea>
+                        </div>
+                        
+                        <div id="upload-section">
+                            <label class="font-bold text-sm text-slate-800 flex justify-between mb-2">
+                                <span>参考图 <span class="font-normal text-xs text-gray-400 ml-1">控制构图与风格</span></span>
+                                <span class="text-xs text-red-600 font-mono" id="ref-count">0/10</span>
+                            </label>
+                            <div id="ref-tray" class="mb-3 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
+                            <div class="relative group">
+                                <input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)">
+                                <div id="upload-placeholder" class="upload-zone rounded-xl h-24 flex flex-col items-center justify-center text-gray-400">
+                                    <span class="text-2xl mb-1">📷</span>
+                                    <span class="text-xs font-medium">点击或拖拽上传图片</span>
+                                </div>
                             </div>
-                            <div class="quality-card" onclick="selectQuality('2k', 10, this)">
-                                <span class="quality-name">高清 (2k)</span>
-                                <span class="quality-cost">- 10 积分</span>
+                        </div>
+                        
+                        <div>
+                            <label class="font-bold text-sm text-slate-800 mb-2 block">画幅比例</label>
+                            <div class="select-wrapper">
+                                <select id="aspect" class="input-field w-full p-3 rounded-xl text-sm font-medium text-slate-700 cursor-pointer">
+                                    <option value="original">📐 按原图比例 (Auto)</option>
+                                    <option value="1:1">1:1 正方形 (社交媒体)</option>
+                                    <option value="16:9">16:9 横屏 (电影感/展示)</option>
+                                    <option value="3:4">3:4 竖屏 (海报/手机)</option>
+                                </select>
                             </div>
-                            <div class="quality-card" onclick="selectQuality('4k', 15, this)">
-                                <span class="quality-name">超清 (4k)</span>
-                                <span class="quality-cost">- 15 积分</span>
+                        </div>
+                            
+                        <div>
+                             <label class="font-bold text-sm text-slate-800 mb-2 block flex justify-between">
+                                 <span>画质等级</span>
+                                 <span class="text-xs text-slate-400 font-normal">消耗积分不同</span>
+                             </label>
+                             <div class="grid grid-cols-3 gap-3">
+                                <div class="quality-card active" onclick="selectQuality('1k', 5, this)">
+                                    <span class="quality-name">标准 (1k)</span>
+                                    <span class="quality-cost">5 💎</span>
+                                </div>
+                                <div class="quality-card" onclick="selectQuality('2k', 10, this)">
+                                    <span class="quality-name">高清 (2k)</span>
+                                    <span class="quality-cost">10 💎</span>
+                                </div>
+                                <div class="quality-card" onclick="selectQuality('4k', 15, this)">
+                                    <span class="quality-name">超清 (4k)</span>
+                                    <span class="quality-cost">15 💎</span>
+                                </div>
                             </div>
                         </div>
 
                     </div>
-                    <div class="p-6 border-t bg-white">
-                        <button onclick="generate()" id="btn-gen" class="w-full btn-primary py-3 rounded-xl font-bold shadow-lg">🚀 立即生成 (消耗 5 积分)</button>
+                    
+                    <div class="p-6 border-t bg-white z-20">
+                        <button onclick="generate()" id="btn-gen" class="w-full btn-primary py-4 rounded-xl font-bold text-lg shadow-lg">
+                            🚀 立即生成 (消耗 5 积分)
+                        </button>
                     </div>
                 </div>
                 <div class="flex-1 bg-gray-100 flex items-center justify-center p-4 relative"><div id="preview" class="bg-white rounded-lg shadow-sm p-2 max-w-full max-h-full overflow-auto flex items-center justify-center min-w-[300px] min-h-[300px]"><span class="text-gray-400">等待生成...</span></div></div>
@@ -539,7 +586,8 @@
                     </div>
                 </div>
             </div>
-            </main>
+
+        </main>
     </div>
 
     <script>
@@ -578,14 +626,15 @@
         const PAGE_SIZE = 20; 
         let hasMoreImages = true;
 
+        // --- V6.8 新增：带实景图的风格定义 (解决“图底不好看”) ---
         const styles = [
-            { name: "默认", color: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500", prompt: "" },
-            { name: "极简白", color: "bg-gradient-to-br from-white to-slate-200 text-slate-600 border border-slate-200", prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k" },
-            { name: "赛博朋克", color: "bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500", prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting" },
-            { name: "新中式", color: "bg-gradient-to-br from-stone-500 to-stone-700", prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic" },
-            { name: "扎哈流体", color: "bg-gradient-to-br from-blue-400 to-cyan-300", prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting" },
-            { name: "工业风", color: "bg-gradient-to-br from-gray-600 to-gray-900", prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows" },
-            { name: "森之屋", color: "bg-gradient-to-br from-emerald-400 to-green-600", prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves" }
+            { name: "默认", img: "https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=300&q=80", prompt: "" },
+            { name: "极简白", img: "https://images.unsplash.com/photo-1594589202476-6d639c054b0c?auto=format&fit=crop&w=300&q=80", prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k" },
+            { name: "赛博朋克", img: "https://images.unsplash.com/photo-1515630278258-407f66498911?auto=format&fit=crop&w=300&q=80", prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting" },
+            { name: "新中式", img: "https://images.unsplash.com/photo-1521910746979-509ce5738676?auto=format&fit=crop&w=300&q=80", prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic" },
+            { name: "扎哈流体", img: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=300&q=80", prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting" },
+            { name: "工业风", img: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=300&q=80", prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows" },
+            { name: "森之屋", img: "https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=300&q=80", prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves" }
         ];
 
         // --- 6.2 初始化与监听 ---
@@ -663,9 +712,23 @@
             location.reload();
         }
 
-        // --- 6.5 UI 渲染逻辑 ---
-        function renderStyles() { document.getElementById('style-container').innerHTML = styles.map((s, index) => `<div class="style-card ${s.color} ${index === 0 ? 'active' : ''}" onclick="selectStyle(this, ${index})"><span>${s.name}</span></div>`).join(''); }
-        function selectStyle(el, index) { document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); el.classList.add('active'); const s = styles[index]; currentStylePrompt = s.prompt; document.getElementById('style-name').innerText = s.name; }
+        // --- 6.5 UI 渲染逻辑 (V6.8 升级版) ---
+        function renderStyles() { 
+            // V6.8: 使用背景图片渲染
+            document.getElementById('style-container').innerHTML = styles.map((s, index) => `
+                <div class="style-card ${index === 0 ? 'active' : ''}" 
+                     style="background-image: url('${s.img}')" 
+                     onclick="selectStyle(this, ${index})">
+                     <span>${s.name}</span>
+                </div>
+            `).join(''); 
+        }
+        function selectStyle(el, index) { 
+            document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active')); 
+            el.classList.add('active'); 
+            const s = styles[index]; currentStylePrompt = s.prompt; 
+            document.getElementById('style-name').innerText = s.name; 
+        }
         
         // --- 6.6 上传与垫图管理 ---
         function handleImageUpload(input) { 
@@ -691,9 +754,9 @@
             const placeholder = document.getElementById('upload-placeholder'); 
             countLabel.innerText = `${refImages.length}/10`; 
             if (refImages.length > 0) { 
-                tray.classList.remove('hidden'); placeholder.classList.add('h-12'); placeholder.querySelector('span').innerText = "继续添加 +"; 
+                tray.classList.remove('hidden'); placeholder.classList.add('h-12'); placeholder.innerHTML = '<span class="text-sm font-bold text-red-500">+ 继续添加</span>'; 
             } else { 
-                tray.classList.add('hidden'); placeholder.classList.remove('h-12'); placeholder.querySelector('span').innerText = "📤 拖拽或点击上传"; 
+                tray.classList.add('hidden'); placeholder.classList.remove('h-12'); placeholder.innerHTML = '<span class="text-2xl mb-1">📷</span><span class="text-xs font-medium">点击或拖拽上传图片</span>'; 
             } 
             tray.innerHTML = refImages.map((img, index) => `
                 <div class="ref-thumb ${selectedRefIds.has(img.id) ? 'selected' : ''}" onclick="toggleRef(${img.id})">
