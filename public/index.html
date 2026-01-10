@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Z先森.AI - Pro (V6.4 画廊修复版)</title>
+    <title>Z先森.AI - Pro (V6.5 画廊修复版)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -349,7 +349,7 @@
             <div class="w-full max-w-md">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.4 Enterprise (Gallery Fix)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.5 Enterprise (Gallery Fixed)</p>
                 </div>
                 <div class="space-y-5">
                     <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl bg-slate-50 text-slate-800 outline-none" placeholder="name@studio.com"></div>
@@ -386,7 +386,7 @@
                    <div class="credit-badge">
                        <span>💎</span> <span id="credit-display">--</span>
                    </div>
-                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.4</span>
+                   <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-mono">V6.5</span>
                 </div>
             </header>
             
@@ -398,7 +398,7 @@
                         <div><label class="font-bold text-sm text-gray-700">设计指令 (Prompt)</label><textarea id="prompt" rows="3" class="w-full mt-2 p-3 border rounded-xl bg-gray-50 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="例如：一个悬崖上的现代美术馆，黄昏时刻..."></textarea></div>
                         
                         <div id="upload-section">
-                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.4 完美生成)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
+                            <label class="font-bold text-sm text-gray-700 flex justify-between"><span>参考图 <span class="font-normal text-xs text-gray-400">(V6.5 参数加强)</span></span><span class="text-xs text-red-600" id="ref-count">0/10</span></label>
                             <div id="ref-tray" class="mt-2 flex gap-2 overflow-x-auto thin-scrollbar pb-2 hidden"></div>
                             <div class="mt-2 relative group"><input type="file" id="refImageInput" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleImageUpload(this)"><div id="upload-placeholder" class="upload-zone rounded-xl h-20 flex flex-col items-center justify-center text-gray-400 bg-gray-50"><span class="text-lg">📤 拖拽或点击上传</span><span class="text-[10px] mt-1 text-gray-300">Temp URL 强力注入</span></div></div>
                         </div>
@@ -645,7 +645,7 @@
         function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
         function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
 
-        // --- 6.7 分页画廊加载 (V6.3 逻辑 - 修复点击ID问题) ---
+        // --- 6.7 分页画廊加载 (V6.3 逻辑) ---
         async function loadGallery(reset = true) { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
@@ -715,7 +715,7 @@
         }
 
         // =======================================================
-        // 🚀 V6.3 核心生成逻辑 (饱和式参数攻击 - 保持不变)
+        // 🚀 V6.3 核心生成逻辑 (饱和式参数攻击 + 线性 Prompt)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -767,10 +767,7 @@
 
                     await Promise.all(selectedImages.map(async (img, index) => {
                         try {
-                            // ★ 使用 base64ToBlob 清洗 (V6.0 增强)
                             const blob = base64ToBlob(img.base64, 'image/png');
-
-                            // V4.1 原始文件名逻辑 (Date.now())
                             const tempName = `temp/${userId}/${Date.now()}_${index}.png`;
                             
                             const { error: uploadError } = await db.storage.from('ai-images').upload(tempName, blob);
@@ -873,7 +870,7 @@
             return new Blob([byteArray], { type: mimeType });
         }
 
-        // --- 6.10 杂项 & 修复下载/画廊 ---
+        // --- 6.10 杂项 & 修复下载/画廊 (V6.5 修复版) ---
         function handleCardClick(id,url,path) { 
             if (isSelectMode) { 
                 if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
@@ -882,7 +879,8 @@
                 else { card.classList.remove('selected-card'); circle.innerText = ''; } 
                 document.getElementById('select-count').innerText = selectedIds.size;
             } else { 
-                openLightbox(url, id, filePath); 
+                // ★ 关键修复：这里的第三个参数必须是 path，不能是 filePath (V6.5 Fix)
+                openLightbox(url, id, path); 
             } 
         }
 
@@ -923,7 +921,7 @@
         function openLightbox(url, id, filePath) { 
             currentLightboxId = id; currentLightboxUrl = url; currentLightboxPath = filePath;
             document.getElementById('lightbox-img').src = url; 
-            // 修复下载点击绑定
+            // 绑定下载事件
             document.getElementById('lightbox-download').onclick = () => downloadImage(url);
             document.getElementById('lightbox').classList.remove('hidden'); 
             document.getElementById('lightbox-del-btn').onclick = async () => { 
@@ -935,7 +933,6 @@
         }
         function closeLightbox() { document.getElementById('lightbox').classList.add('hidden'); }
         
-        // 强力下载修复：使用 Fetch Blob 解决跨域/下载失败问题
         async function downloadImage(url) { 
             try {
                 const response = await fetch(url);
