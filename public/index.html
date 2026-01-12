@@ -723,7 +723,43 @@ const styles = [
         }
 
         // --- 6.4 身份验证 ---
-        async function signUp() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signUp({email,password}); if(error) alert(error.message); else alert("注册请求已发送，请查收邮件确认！"); }
+        async function signUp() { 
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    
+    if (!email || !password) {
+        alert("请输入邮箱和密码");
+        return;
+    }
+
+    // 1. 先调用我们写的 RPC 函数检查邮箱
+    try {
+        const { data: exists, error: checkError } = await db.rpc('check_email_exists', { 
+            email_input: email 
+        });
+
+        if (checkError) throw checkError;
+
+        // 2. 如果存在，直接阻断并提示
+        if (exists) {
+            alert("❌ 该邮箱已被注册，请直接登录！");
+            return; // 停在这里，不往下走了
+        }
+
+        // 3. 如果不存在，才发送注册请求
+        const { error } = await db.auth.signUp({ email, password });
+        
+        if (error) {
+            alert("注册失败: " + error.message);
+        } else {
+            alert("✅ 注册请求已发送，请查收邮件确认！");
+        }
+
+    } catch (err) {
+        console.error("检查失败:", err);
+        alert("系统错误，请稍后重试");
+    }
+}
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
         async function signOut() { await db.auth.signOut(); }
@@ -1157,6 +1193,7 @@ const styles = [
     </script>
 </body>
 </html>
+
 
 
 
