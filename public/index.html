@@ -981,28 +981,44 @@ const styles = [
 
                 // --- 步骤 2: 线性拼接 (V4.1 原版逻辑) ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
-                
+
+                // 1. 基础画质词
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
                 if (selectedQuality === '2k') finalPrompt += ", 2k resolution, high detailed";
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution, hyper detailed";
 
-                if (refImageUrls.length > 0) {
-                      finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
-                      refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
+                // 2. 动态逻辑：根据图片数量，用“人话”告诉模型怎么做
+                if (refImageUrls.length >= 2) {
+                    // ★★★ 核心改动：用自然语言明确分工，激发模型的理解力 ★★★
+                    finalPrompt += `\n\n[Task Instruction]`;
+                    finalPrompt += `\n1. PRIMARY IMAGE (Structure): ${refImageUrls[0]}`;
+                    finalPrompt += `\n2. REFERENCE IMAGE (Style): ${refImageUrls[1]}`;
+                    finalPrompt += `\n\nPlease generate a NEW architectural rendering.`;
+                    finalPrompt += `\nCONSTRAINT: You must STRICTLY maintain the building geometry, perspective, and massing of the [PRIMARY IMAGE].`;
+                    finalPrompt += `\nSTYLE: Apply the material texture, lighting mood, and rendering style of the [REFERENCE IMAGE] to the structure.`;
+                    
+                    // 保留你之前觉得好用的魔法词作为“加强补丁”
+                    finalPrompt += ` --cref ${refImageUrls[0]} --sref ${refImageUrls[1]} --iw 2`;
+                    
+                } else if (refImageUrls.length === 1) {
+                    // 单图模式
+                    finalPrompt += ` --sref ${refImageUrls[0]} --iw 2`;
+                    finalPrompt += ` (Reference Image: ${refImageUrls[0]})`;
                 }
 
-                // --- ★★★ 步骤 3: 暴力参数注入 (V6.3) ★★★ ---
+                // --- 步骤 3: Payload 构建 ---
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: sizeParam, 
                     n: 1,
-                    // 1. 标准 OpenAI 字段
+                    // ★★★ 不锁死 temperature，删除该字段，让模型自己发挥 ★★★
+                    
+                    // 这里依然要把第一张图传进去，作为视觉锚点
                     image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    // 2. 简易接口字段
-                    image: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    // 3. 某些定制接口字段
-                    ref_image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined
+                    
+                    // 尝试把所有链接发给后端（如果后端支持的话），不支持也没关系，Prompt里已经写了
+                    image_urls: refImageUrls 
                 };
 
                 const res = await fetch('/api/proxy', {
@@ -1193,6 +1209,7 @@ const styles = [
     </script>
 </body>
 </html>
+
 
 
 
