@@ -130,45 +130,58 @@ app.listen(port, () => {
                       //'0 */12 * * *' -> 每 12 小时一次
                       //'0 * * * *' -> 每小时的第 0 分钟执行一次
 cron.schedule('0 0 * * *', async () => {
-    console.log('🕒 [自动任务] 开始清理 temp 文件夹...');
+    console.log('🕒 [自动任务] 开始深度清理 temp 文件夹...');
 
-    const BUCKET_NAME = 'images'; // ⚠️ 请确认你的存储桶名字！是 'images' 还是别的？
-    const FOLDER_NAME = 'temp';
+    // ⚠️ 修正：根据截图，你的桶名字是 'ai-images'
+    const BUCKET_NAME = 'ai-images'; 
+    const ROOT_FOLDER = 'temp';
 
     try {
-        // 1. 列出 temp 文件夹下的所有文件
-        const { data: files, error: listError } = await supabase
+        // 1. 先列出 temp 下面有哪些“用户文件夹”
+        const { data: userFolders, error: listError } = await supabase
             .storage
             .from(BUCKET_NAME)
-            .list(FOLDER_NAME, { limit: 100, offset: 0 });
+            .list(ROOT_FOLDER);
 
         if (listError) throw listError;
 
-        // 如果文件夹是空的，或者是只有占位符，就直接结束
-        if (!files || files.length === 0) {
-            console.log('✅ temp 文件夹已经是空的，无需清理。');
+        if (!userFolders || userFolders.length === 0) {
+            console.log('✅ temp 文件夹已经是空的。');
             return;
         }
 
-        // 2. 提取文件路径 (注意：要加上文件夹前缀)
-        // 过滤掉 .emptyFolderPlaceholder (如果有的话，防止把文件夹本身删没了)
-        const filesToDelete = files
-            .filter(file => file.name !== '.emptyFolderPlaceholder')
-            .map(file => `${FOLDER_NAME}/${file.name}`);
+        let totalFilesDeleted = 0;
 
-        if (filesToDelete.length === 0) return;
+        // 2. 遍历每一个“用户文件夹”，把里面的图片找出来
+        for (const folder of userFolders) {
+            // 跳过占位符文件（如果有的话）
+            if (folder.name === '.emptyFolderPlaceholder') continue;
 
-        console.log(`🗑️ 准备删除 ${filesToDelete.length} 个文件...`);
+            const userFolderPath = `${ROOT_FOLDER}/${folder.name}`;
+            
+            // 钻进文件夹找图片
+            const { data: files } = await supabase
+                .storage
+                .from(BUCKET_NAME)
+                .list(userFolderPath);
 
-        // 3. 执行批量删除
-        const { error: removeError } = await supabase
-            .storage
-            .from(BUCKET_NAME)
-            .remove(filesToDelete);
+            if (files && files.length > 0) {
+                // 拼凑出完整的文件路径: temp/用户ID/图片.png
+                const pathsToDelete = files.map(f => `${userFolderPath}/${f.name}`);
+                
+                // 执行删除
+                const { error: removeError } = await supabase
+                    .storage
+                    .from(BUCKET_NAME)
+                    .remove(pathsToDelete);
+                
+                if (!removeError) {
+                    totalFilesDeleted += pathsToDelete.length;
+                }
+            }
+        }
 
-        if (removeError) throw removeError;
-
-        console.log('✅ 清理完成！');
+        console.log(`✅ 清理完成！共删除了 ${totalFilesDeleted} 张临时图片，所有空文件夹已自动消失。`);
 
     } catch (err) {
         console.error('❌ 清理失败:', err.message);
