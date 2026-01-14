@@ -1,3 +1,4 @@
+const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -122,4 +123,54 @@ app.get('*', (req, res) => {
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+});
+// 设置定时任务：每天凌晨 00:00 执行 ('0 0 * * *')
+// 如果你想测试，可以改成 '* * * * *' (每分钟执行一次)
+                      //'0 0 * * *' -> 每天凌晨 0 点（推荐）
+                      //'0 */12 * * *' -> 每 12 小时一次
+                      //'0 * * * *' -> 每小时的第 0 分钟执行一次
+cron.schedule('0 0 * * *', async () => {
+    console.log('🕒 [自动任务] 开始清理 temp 文件夹...');
+
+    const BUCKET_NAME = 'images'; // ⚠️ 请确认你的存储桶名字！是 'images' 还是别的？
+    const FOLDER_NAME = 'temp';
+
+    try {
+        // 1. 列出 temp 文件夹下的所有文件
+        const { data: files, error: listError } = await supabase
+            .storage
+            .from(BUCKET_NAME)
+            .list(FOLDER_NAME, { limit: 100, offset: 0 });
+
+        if (listError) throw listError;
+
+        // 如果文件夹是空的，或者是只有占位符，就直接结束
+        if (!files || files.length === 0) {
+            console.log('✅ temp 文件夹已经是空的，无需清理。');
+            return;
+        }
+
+        // 2. 提取文件路径 (注意：要加上文件夹前缀)
+        // 过滤掉 .emptyFolderPlaceholder (如果有的话，防止把文件夹本身删没了)
+        const filesToDelete = files
+            .filter(file => file.name !== '.emptyFolderPlaceholder')
+            .map(file => `${FOLDER_NAME}/${file.name}`);
+
+        if (filesToDelete.length === 0) return;
+
+        console.log(`🗑️ 准备删除 ${filesToDelete.length} 个文件...`);
+
+        // 3. 执行批量删除
+        const { error: removeError } = await supabase
+            .storage
+            .from(BUCKET_NAME)
+            .remove(filesToDelete);
+
+        if (removeError) throw removeError;
+
+        console.log('✅ 清理完成！');
+
+    } catch (err) {
+        console.error('❌ 清理失败:', err.message);
+    }
 });
