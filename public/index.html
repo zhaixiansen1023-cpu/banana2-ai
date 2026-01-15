@@ -1043,9 +1043,7 @@
                     prompt: finalPrompt, 
                     size: sizeParam, 
                     n: 1,
-                    image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    image: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    ref_image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined
+                   response_format: "b64_json"
                 };
 
                 const res = await fetch('/api/proxy', {
@@ -1269,5 +1267,6 @@
     </script>
 </body>
 </html>
+
 
 
