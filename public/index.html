@@ -1043,7 +1043,6 @@
                     prompt: finalPrompt, 
                     size: sizeParam, 
                     n: 1,
-                    response_format: "b64_json",  // 直接索要 Base64 数据，不走 URL 下载
                     image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
                     image: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
                     ref_image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined
@@ -1270,4 +1269,5 @@
     </script>
 </body>
 </html>
+
 
