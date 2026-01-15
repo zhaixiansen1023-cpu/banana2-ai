@@ -171,24 +171,22 @@
             transform: scale(0.98); 
         }
         .style-card.active::after { 
-    content: '✓'; 
-    position: absolute; 
-    inset: 0; /* 撑满整个卡片 */
-    border: 2px solid #DB4437; /* 红框在这里画 */
-    border-radius: 12px; 
-    z-index: 20; 
-    color: white; 
-    font-size: 10px; 
-    font-weight: bold; 
-    /* 让对号显示在右上角 */
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-start;
-    padding: 4px 6px; 
-    background: transparent;
-    /* 给对号加个小红底，更清晰（可选） */
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
+            content: '✓'; 
+            position: absolute; 
+            inset: 0; 
+            border: 2px solid #DB4437; 
+            border-radius: 12px; 
+            z-index: 20; 
+            color: white; 
+            font-size: 10px; 
+            font-weight: bold; 
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            padding: 4px 6px; 
+            background: transparent;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
 
         /* --- 参考图缩略图 --- */
         .ref-thumb { 
@@ -308,7 +306,7 @@
             border-color: #DB4437; 
             background-color: #fef2f2; 
             color: #b91c1c; 
-            ring: 1px solid #DB4437; /* 新增选中外圈 */
+            ring: 1px solid #DB4437; 
         }
         .quality-name { 
             display: block; 
@@ -390,22 +388,58 @@
                 <p class="text-lg text-slate-300 font-light leading-relaxed">Google 最强建筑灵感引擎。<br>专为建筑师打造的高级工作台。</p>
             </div>
         </div>
-        <div class="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-white">
-            <div class="w-full max-w-md">
+        
+        <div class="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-white relative">
+            
+            <div id="card-login" class="w-full max-w-md animate-fade-in">
                 <div class="mb-8">
                     <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">Z先森.AI</h1>
-                    <p class="text-slate-400 text-sm mt-1">v6.8 Enterprise (UI Refactored)</p>
+                    <p class="text-slate-400 text-sm mt-1">v6.8 Enterprise (Pro)</p>
                 </div>
                 <div class="space-y-5">
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Email</label><input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="name@studio.com"></div>
-                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">Password</label><input type="password" id="password" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="••••••••"></div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
+                        <input type="email" id="email" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="name@studio.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Password</label>
+                        <input type="password" id="password" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="••••••••">
+                    </div>
                     <div class="flex items-center justify-between mt-2">
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="remember-me" class="checkbox-custom" checked><span class="text-sm text-slate-500 font-medium select-none">记住我</span></label>
                         <button onclick="forgotPassword()" class="text-sm font-bold text-red-600 hover:text-red-700 hover:underline">忘记密码?</button>
                     </div>
                     <button onclick="signIn()" class="w-full btn-primary py-4 rounded-xl font-bold text-lg shadow-lg mt-2">进入工作台</button>
-                    <div class="flex items-center justify-between mt-6"><div class="h-[1px] bg-slate-100 flex-1"></div><span class="text-xs text-slate-400 px-4">New here?</span><div class="h-[1px] bg-slate-100 flex-1"></div></div>
-                    <button onclick="signUp()" class="w-full py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition border border-transparent hover:border-slate-200">注册新账号 (送20积分)</button>
+                    
+                    <div class="flex items-center justify-center mt-6 gap-2">
+                        <span class="text-xs text-slate-400">还没有账号？</span>
+                        <button onclick="switchAuth('register')" class="text-sm font-bold text-red-600 hover:underline">去注册 (送20积分)</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card-register" class="w-full max-w-md hidden animate-fade-in">
+                <div class="mb-8">
+                    <h1 class="text-4xl font-black text-slate-900 tracking-tighter italic">创建账号</h1>
+                    <p class="text-slate-400 text-sm mt-1">Join the future of design.</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">注册邮箱</label>
+                        <input type="email" id="reg-email" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="你的常用邮箱">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">设置密码</label>
+                        <input type="password" id="reg-password" class="input-field w-full px-5 py-4 rounded-xl text-slate-800 outline-none" placeholder="设置一个强密码">
+                    </div>
+                    <button onclick="signUp()" class="w-full py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg mt-2 transition-all">
+                        确认注册
+                    </button>
+                    
+                    <div class="flex items-center justify-center mt-6 gap-2">
+                        <span class="text-xs text-slate-400">已有账号？</span>
+                        <button onclick="switchAuth('login')" class="text-sm font-bold text-red-600 hover:underline">直接登录</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -628,54 +662,54 @@
         let hasMoreImages = true;
 
        // --- V6.8 最终版配置：使用本地 assets 路径 ---
-const styles = [
-    {
-        name: "默认",
-        // ✅ 这里的路径对应你 public/assets 文件夹里的文件名
-        img: "assets/PixPin_2026-01-11_18-47-57.jpg",
-        prompt: ""
-    },
-    {
-        name: "建筑白模",
-        img: "assets/80082030d5fda554b772704dc3bdb4b9.jpg",
-        prompt: "architectural model rendering, white clay material, monochrome, miniature scale, clean lines, abstract form, studio lighting, soft shadows, untextured, minimalist aesthetic"
-    },
-    {
-        name: "简约现代",
-        img: "assets/e11796b490c9e9ff20961a0738e5e010.jpg",
-        prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k"
-    },
-    {
-        name: "夜景",
-        img: "assets/7de3bb7cff3f320483eca75de59c3145.jpg",
-        prompt: "night scene architecture, building illuminated from within, glowing windows, street lights, dramatic artificial lighting, blue hour sky, deep shadows, cinematic atmosphere, photorealistic"
-    },
-    {
-        name: "赛博朋克",
-        img: "assets/c9ac6cf53e2b60718df293aaa5ca0edd.jpg",
-        prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting"
-    },
-    {
-        name: "新中式",
-        img: "assets/e567b8b5ce1c63887d9a6f3c72369308.jpg",
-        prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic"
-    },
-    {
-        name: "扎哈流体",
-        img: "assets/5c5c26205f1cccb8788b6b78ad85feba.jpg",
-        prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting"
-    },
-    {
-        name: "工业风",
-        img: "assets/1285cce92fcdcbcc1dac485bf7b93077.jpg",
-        prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows"
-    },
-    {
-        name: "森之屋",
-        img: "assets/2241af18711c385f0691c3cf9ec9840e.jpg",
-        prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves"
-    }
-];
+        const styles = [
+            {
+                name: "默认",
+                img: "assets/PixPin_2026-01-11_18-47-57.jpg",
+                prompt: ""
+            },
+            {
+                name: "建筑白模",
+                img: "assets/80082030d5fda554b772704dc3bdb4b9.jpg",
+                prompt: "architectural model rendering, white clay material, monochrome, miniature scale, clean lines, abstract form, studio lighting, soft shadows, untextured, minimalist aesthetic"
+            },
+            {
+                name: "简约现代",
+                img: "assets/e11796b490c9e9ff20961a0738e5e010.jpg",
+                prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k"
+            },
+            {
+                name: "夜景",
+                img: "assets/7de3bb7cff3f320483eca75de59c3145.jpg",
+                prompt: "night scene architecture, building illuminated from within, glowing windows, street lights, dramatic artificial lighting, blue hour sky, deep shadows, cinematic atmosphere, photorealistic"
+            },
+            {
+                name: "赛博朋克",
+                img: "assets/c9ac6cf53e2b60718df293aaa5ca0edd.jpg",
+                prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting"
+            },
+            {
+                name: "新中式",
+                img: "assets/e567b8b5ce1c63887d9a6f3c72369308.jpg",
+                prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic"
+            },
+            {
+                name: "扎哈流体",
+                img: "assets/5c5c26205f1cccb8788b6b78ad85feba.jpg",
+                prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting"
+            },
+            {
+                name: "工业风",
+                img: "assets/1285cce92fcdcbcc1dac485bf7b93077.jpg",
+                prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows"
+            },
+            {
+                name: "森之屋",
+                img: "assets/2241af18711c385f0691c3cf9ec9840e.jpg",
+                prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves"
+            }
+        ];
+        
         // --- 6.2 初始化与监听 ---
         window.onload = async () => {
             const { data: { session } } = await db.auth.getSession();
@@ -722,44 +756,61 @@ const styles = [
             updateCreditUI();
         }
 
-        // --- 6.4 身份验证 ---
-        async function signUp() { 
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
-    
-    if (!email || !password) {
-        alert("请输入邮箱和密码");
-        return;
-    }
-
-    // 1. 先调用我们写的 RPC 函数检查邮箱
-    try {
-        const { data: exists, error: checkError } = await db.rpc('check_email_exists', { 
-            email_input: email 
-        });
-
-        if (checkError) throw checkError;
-
-        // 2. 如果存在，直接阻断并提示
-        if (exists) {
-            alert("❌ 该邮箱已被注册，请直接登录！");
-            return; // 停在这里，不往下走了
-        }
-
-        // 3. 如果不存在，才发送注册请求
-        const { error } = await db.auth.signUp({ email, password });
+        // --- 6.4 身份验证与视图切换 (🟢 修正版) ---
         
-        if (error) {
-            alert("注册失败: " + error.message);
-        } else {
-            alert("✅ 注册请求已发送，请查收邮件确认！");
+        // 切换登录/注册视图
+        function switchAuth(mode) {
+            const loginCard = document.getElementById('card-login');
+            const registerCard = document.getElementById('card-register');
+
+            if (mode === 'register') {
+                loginCard.classList.add('hidden');
+                registerCard.classList.remove('hidden');
+            } else {
+                registerCard.classList.add('hidden');
+                loginCard.classList.remove('hidden');
+            }
         }
 
-    } catch (err) {
-        console.error("检查失败:", err);
-        alert("系统错误，请稍后重试");
-    }
-}
+        async function signUp() { 
+            // 注意：使用专用的注册输入框
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+            
+            if (!email || !password) return alert("请输入注册邮箱和密码");
+
+            try {
+                // 先检查邮箱是否存在
+                const { data: exists, error: checkError } = await db.rpc('check_email_exists', { 
+                    email_input: email 
+                });
+
+                if (checkError) throw checkError;
+
+                if (exists) {
+                    alert("❌ 该邮箱已被注册，请直接登录！");
+                    switchAuth('login');
+                    return;
+                }
+
+                const { error } = await db.auth.signUp({ email, password });
+                
+                if (error) {
+                    alert("注册失败: " + error.message);
+                } else {
+                    alert("✅ 注册请求已发送！\n请查收邮件，然后登录。");
+                    switchAuth('login');
+                    // 自动填入邮箱
+                    document.getElementById('email').value = email;
+                    document.getElementById('password').value = ''; 
+                }
+
+            } catch (err) {
+                console.error("Error:", err);
+                alert("系统错误，请稍后重试");
+            }
+        }
+
         async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
         async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
         async function signOut() { await db.auth.signOut(); }
@@ -787,9 +838,8 @@ const styles = [
             location.reload();
         }
 
-        // --- 6.5 UI 渲染逻辑 (V6.8 升级版) ---
+        // --- 6.5 UI 渲染逻辑 ---
         function renderStyles() { 
-            // V6.8: 使用背景图片渲染
             document.getElementById('style-container').innerHTML = styles.map((s, index) => `
                 <div class="style-card ${index === 0 ? 'active' : ''}" 
                      style="background-image: url('${s.img}')" 
@@ -841,7 +891,7 @@ const styles = [
         function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
         function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
 
-        // --- 6.7 分页画廊加载 (V6.3 逻辑) ---
+        // --- 6.7 分页画廊加载 ---
         async function loadGallery(reset = true) { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
@@ -911,7 +961,7 @@ const styles = [
         }
 
         // =======================================================
-        // 🚀 V6.3 核心生成逻辑 (饱和式参数攻击 + 线性 Prompt)
+        // 🚀 V6.3 核心生成逻辑 (🟢 修正：增加下载按钮显示)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -926,7 +976,6 @@ const styles = [
             btn.classList.replace('btn-primary', 'bg-gray-400');
             btn.onclick = () => abortController.abort(); 
 
-            // 1. 获取 Token
             const { data: { session } } = await db.auth.getSession();
             if (!session) return alert("请重新登录");
             const token = session.access_token; 
@@ -972,14 +1021,11 @@ const styles = [
                             tempUploadPaths.push(tempName); 
                             const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(tempName);
                             refImageUrls.push(publicUrl);
-                        } catch (e) { 
-                            console.error("上传细节错误:", e);
-                            throw e; 
-                        }
+                        } catch (e) { throw e; }
                     }));
                 }
 
-                // --- 步骤 2: 线性拼接 (V4.1 原版逻辑) ---
+                // --- 步骤 2: 线性拼接 ---
                 preview.innerHTML = '<span class="animate-pulse text-red-600">正在排队生成...</span>';
                 
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
@@ -991,17 +1037,14 @@ const styles = [
                       refImageUrls.forEach(url => { finalPrompt += ` (Reference Image: ${url})`; });
                 }
 
-                // --- ★★★ 步骤 3: 暴力参数注入 (V6.3) ★★★ ---
+                // --- 步骤 3: 暴力参数注入 ---
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: sizeParam, 
                     n: 1,
-                    // 1. 标准 OpenAI 字段
                     image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    // 2. 简易接口字段
                     image: refImageUrls.length > 0 ? refImageUrls[0] : undefined,
-                    // 3. 某些定制接口字段
                     ref_image_url: refImageUrls.length > 0 ? refImageUrls[0] : undefined
                 };
 
@@ -1012,7 +1055,11 @@ const styles = [
 
                 const json = await res.json();
                 if (res.status === 402) throw new Error("余额不足 (后端拦截)");
-                if (res.status !== 200) throw new Error(json.error?.message || "生成失败");
+                
+                // 🟢 修正：优雅处理后端传回的 502/其他错误
+                if (res.status !== 200) {
+                    throw new Error(json.error?.message || json.error || "生成失败");
+                }
 
                 // --- 步骤 4: 保存结果 ---
                 preview.innerHTML = '<span class="text-green-600">保存中...</span>';
@@ -1029,7 +1076,21 @@ const styles = [
                 const {data:{publicUrl}} = db.storage.from('ai-images').getPublicUrl(path);
                 await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: publicUrl, file_path: path });
                 
-                preview.innerHTML = `<img src="${publicUrl}" class="rounded shadow-lg max-h-[70vh]">`;
+                // 🟢 修正：生成成功后，显示带下载按钮的预览
+                preview.innerHTML = `
+                    <div class="relative w-full h-full flex items-center justify-center group">
+                        <img src="${publicUrl}" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
+                        
+                        <div class="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
+                            <button onclick="forceDownload('${publicUrl}')" class="bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-red-50 hover:text-red-600 transition flex items-center gap-2">
+                                <span>⬇️</span> 下载原图
+                            </button>
+                            <a href="${publicUrl}" target="_blank" class="bg-slate-800/80 backdrop-blur text-white px-4 py-3 rounded-full hover:bg-slate-900 transition" title="新窗口打开">
+                                🔍
+                            </a>
+                        </div>
+                    </div>
+                `;
                 
                 if (tempUploadPaths.length > 0) await db.storage.from('ai-images').remove(tempUploadPaths);
                 fetchCredits(); loadGallery(); resetUI_Success();
@@ -1055,6 +1116,21 @@ const styles = [
         }
 
         // --- 6.9 辅助工具函数 ---
+        
+        // 🟢 新增：强制下载图片函数
+        async function forceDownload(url) {
+            try {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                a.href = window.URL.createObjectURL(blob);
+                a.download = `Z-Design-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch(e) { window.open(url, '_blank'); }
+        }
+
         function base64ToBlob(base64, mimeType) {
             const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
             const byteCharacters = atob(cleanBase64);
@@ -1147,7 +1223,7 @@ const styles = [
         
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
 
-        // --- 6.11 意见反馈逻辑 (V6.6 新增) ---
+        // --- 6.11 意见反馈逻辑 ---
         async function submitFeedback() {
             const btn = document.getElementById('btn-submit-feedback');
             const contentInput = document.getElementById('feedback-content');
@@ -1193,8 +1269,3 @@ const styles = [
     </script>
 </body>
 </html>
-
-
-
-
-
