@@ -4,6 +4,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const https = require('https'); // 🟢 新增：引入 https 模块
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,7 +14,6 @@ const requiredEnv = ['API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
     console.error(`❌ 严重错误: 缺少环境变量: ${missingEnv.join(', ')}`);
-    // 注意：不要在生产环境直接退出，防止服务不断重启，但功能会失效
 }
 
 // 初始化 Supabase 管理员客户端 (用于后端扣费)
@@ -27,7 +27,6 @@ const ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     'zhaixiansen.zeabur.app', // 你的 Zeabur 域名
-    // '你的项目.vercel.app' 
 ];
 
 const corsOptions = {
@@ -41,14 +40,23 @@ const corsOptions = {
     }
 };
 
+// 🟢 新增：创建一个“忽略 SSL 证书错误”的代理 (专治 api.tu-zi.com 证书报错)
+const ignoreSSL = new https.Agent({
+    rejectUnauthorized: false
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Server: Secure & Billing Active'));
+app.get('/', (req, res) => res.send('Z-AI Server: Secure & Billing Active (Patched)'));
 
 // --- 核心：带扣费逻辑的代理接口 ---
 app.post('/api/proxy', async (req, res) => {
+    // 定义变量用于后续可能的退款
+    let userForRefund = null;
+    let costForRefund = 0;
+
     try {
         // 1. 身份验证：从请求头里拿 Token
         const authHeader = req.headers.authorization;
@@ -67,7 +75,6 @@ app.post('/api/proxy', async (req, res) => {
         // 3. 计算扣费金额 (根据画质参数)
         const reqBody = req.body;
         let cost = 5; // 默认 1k 价格
-        // 根据模型ID判断扣费，防止前端传假价格
         if (reqBody.model && reqBody.model.includes('4k')) cost = 15;
         else if (reqBody.model && reqBody.model.includes('2k')) cost = 10;
 
@@ -81,12 +88,15 @@ app.post('/api/proxy', async (req, res) => {
 
         if (creditError) {
             console.error("扣费失败:", creditError);
-            // 区分是余额不足还是系统错误
             if (creditError.message && creditError.message.includes('积分不足')) {
                 return res.status(402).json({ error: { message: "余额不足，请充值" } });
             }
             return res.status(500).json({ error: { message: "积分系统异常" } });
         }
+
+        // 记录下来，如果后面 API 调用崩了，好把钱退给人家
+        userForRefund = user;
+        costForRefund = cost;
 
         // --- 5. 扣费成功，才允许调用 AI ---
         const apiKey = process.env.API_KEY;
@@ -96,23 +106,42 @@ app.post('/api/proxy', async (req, res) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify(reqBody)
+            body: JSON.stringify(reqBody),
+            agent: ignoreSSL // 🟢 新增：强制忽略 SSL 证书报错
         });
 
-        const data = await response.json();
+        // 🟢 新增：防崩坏逻辑
+        // 先检查对方状态码，如果不是 200 OK，千万别解析 JSON，否则会报错 "Unexpected token B"
+        if (!response.ok) {
+            const errorText = await response.text(); // 以文本形式读取错误
+            console.error(`❌ 供应商报错 (${response.status}):`, errorText);
 
-        // 如果 API 调用失败（比如参数错误），应该把积分退回去！(进阶逻辑)
-        if (response.status !== 200) {
-            console.warn("AI 生成失败，正在退款...");
-            await supabase.rpc('increment_credits', { count: cost, x_user_id: user.id }); // 需在 SQL 创建此函数
-            return res.status(response.status).json(data);
+            // 💰 自动退款逻辑：供应商挂了，必须把积分退给用户
+            if (userForRefund) {
+                console.warn(`正在为用户 ${userForRefund.email} 执行退款: ${costForRefund} 积分...`);
+                await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+            }
+            
+            // 把错误原样扔回给前端，自己别崩
+            return res.status(response.status).json({
+                error: { message: `供应商服务异常 (${response.status})，积分已自动退回。` },
+                details: errorText.substring(0, 200) 
+            });
         }
-        
+
+        const data = await response.json();
         res.status(200).json(data);
 
     } catch (error) {
         console.error("Proxy Error:", error);
-        res.status(500).json({ error: { message: "服务器内部错误" } });
+        
+        // 💰 发生代码级异常（如网络中断），也要退款
+        if (userForRefund) {
+            console.warn(`系统异常，执行退款: ${costForRefund} 积分...`);
+            await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+        }
+
+        res.status(500).json({ error: { message: "服务器内部错误，积分已退回" } });
     }
 });
 
@@ -124,15 +153,11 @@ app.get('*', (req, res) => {
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
-// 设置定时任务：每天凌晨 00:00 执行 ('0 0 * * *')
-// 如果你想测试，可以改成 '* * * * *' (每分钟执行一次)
-                      //'0 0 * * *' -> 每天凌晨 0 点（推荐）
-                      //'0 */12 * * *' -> 每 12 小时一次
-                      //'0 * * * *' -> 每小时的第 0 分钟执行一次
+
+// 设置定时任务：每天凌晨 00:00 执行
 cron.schedule('0 0 * * *', async () => {
     console.log('🕒 [自动任务] 开始深度清理 temp 文件夹...');
 
-    // ⚠️ 修正：根据截图，你的桶名字是 'ai-images'
     const BUCKET_NAME = 'ai-images'; 
     const ROOT_FOLDER = 'temp';
 
@@ -154,7 +179,7 @@ cron.schedule('0 0 * * *', async () => {
 
         // 2. 遍历每一个“用户文件夹”，把里面的图片找出来
         for (const folder of userFolders) {
-            // 跳过占位符文件（如果有的话）
+            // 跳过占位符文件
             if (folder.name === '.emptyFolderPlaceholder') continue;
 
             const userFolderPath = `${ROOT_FOLDER}/${folder.name}`;
@@ -166,7 +191,6 @@ cron.schedule('0 0 * * *', async () => {
                 .list(userFolderPath);
 
             if (files && files.length > 0) {
-                // 拼凑出完整的文件路径: temp/用户ID/图片.png
                 const pathsToDelete = files.map(f => `${userFolderPath}/${f.name}`);
                 
                 // 执行删除
