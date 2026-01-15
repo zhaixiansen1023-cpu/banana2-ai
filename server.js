@@ -151,7 +151,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server running on port ${port} - V7.1 SSL修复版`); // 👈 改这里
 });
 
 // 设置定时任务：每天凌晨 00:00 执行
@@ -211,3 +211,4 @@ cron.schedule('0 0 * * *', async () => {
         console.error('❌ 清理失败:', err.message);
     }
 });
+
