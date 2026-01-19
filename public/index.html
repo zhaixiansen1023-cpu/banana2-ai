@@ -7,6 +7,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/upscaler@latest/dist/browser/upscaler.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
@@ -366,10 +368,15 @@
     <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center p-4">
         <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white text-4xl">&times;</button>
         <img id="lightbox-img" class="max-w-full max-h-[85vh] rounded shadow-2xl object-contain">
-        <div class="flex gap-4 mt-6">
-            <button id="lightbox-download" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer">下载原图</button>
-            <button id="lightbox-del-btn" class="px-6 py-2 bg-red-600/20 text-red-500 border border-red-600/50 rounded-full font-bold text-sm hover:bg-red-600 hover:text-white transition">删除</button>
-        </div>
+        <div class="flex gap-4 mt-6 items-center">
+    <button id="btn-upscale" onclick="handleLocalUpscale()" class="px-6 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-bold text-sm hover:shadow-lg hover:scale-105 transition flex items-center gap-2">
+        <span>✨</span> AI 本地精修 (免费)
+    </button>
+
+    <button id="lightbox-download" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer">下载原图</button>
+    <button id="lightbox-del-btn" class="px-6 py-2 bg-red-600/20 text-red-500 border border-red-600/50 rounded-full font-bold text-sm hover:bg-red-600 hover:text-white transition">删除</button>
+</div>
+<div id="upscale-status" class="text-white text-xs mt-2 hidden">正在利用显卡加速运算... <span id="upscale-percent">0</span>%</div>
     </div>
 
     <div id="batch-bar" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-white shadow-2xl border border-gray-200 rounded-full px-6 py-3 flex items-center gap-6 hidden transform transition-all duration-300 translate-y-20">
@@ -1264,9 +1271,76 @@
                 btn.disabled = false;
             }
         }
+        // ==========================================
+    //  新增：零成本 AI 本地放大逻辑 (Copy Paste)
+    // ==========================================
+    
+    let upscalerEngine = null; // 存放我们的“渲染引擎”
+
+    // 1. 页面加载完，静默初始化引擎
+    window.addEventListener('load', async () => {
+        console.log("正在预热 AI 放大引擎...");
+        // 初始化一个 2倍放大的模型，速度快，适合浏览器跑
+        upscalerEngine = new Upscaler({
+            model: {
+                scale: 2, 
+            }
+        });
+    });
+
+    // 2. 点击按钮后触发的函数
+    async function handleLocalUpscale() {
+        const imgEl = document.getElementById('lightbox-img');
+        const btn = document.getElementById('btn-upscale');
+        const statusEl = document.getElementById('upscale-status');
+        const percentEl = document.getElementById('upscale-percent');
+        
+        // 防止没有图或者正在跑
+        if (!imgEl.src || btn.disabled) return;
+
+        // UI 变身：锁定按钮，显示进度条
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = `<span>⏳</span> 正在运算...`;
+        statusEl.classList.remove('hidden');
+
+        try {
+            // 开始跑 AI 运算
+            // patchSize: 64 意思是把图切成小块处理，防止把浏览器卡死
+            const upscaledSrc = await upscalerEngine.upscale(imgEl.src, {
+                patchSize: 64,
+                padding: 5,
+                progress: (amount) => {
+                    // 更新百分比数字
+                    percentEl.innerText = Math.round(amount * 100);
+                }
+            });
+
+            // 运算完成！替换图片显示
+            imgEl.src = upscaledSrc;
+            
+            // 同时也让下载按钮下载这张高清图
+            const downloadBtn = document.getElementById('lightbox-download');
+            downloadBtn.onclick = () => downloadImage(upscaledSrc);
+
+            alert("✅ 放大完成！画质已增强 2 倍。");
+
+        } catch (err) {
+            console.error(err);
+            alert("❌ 放大失败：可能是图片太大，或者你的显卡显存不足。");
+        } finally {
+            // 恢复按钮状态
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = originalText;
+            statusEl.classList.add('hidden');
+        }
+    }
     </script>
 </body>
 </html>
+
 
 
 
