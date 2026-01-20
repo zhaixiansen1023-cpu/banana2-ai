@@ -363,7 +363,7 @@
         }
     </style>
 </head>
-<body class="h-screen overflow-hidden text-slate-700 bg-slate-50">
+<body class="min-h-screen lg:h-screen lg:overflow-hidden overflow-auto text-slate-700 bg-slate-50 pb-20 lg:pb-0">
 
     <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center p-4">
         <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white text-4xl">&times;</button>
@@ -453,7 +453,7 @@
     </div>
 
     <div id="app-view" class="h-screen flex hidden">
-        <aside class="w-20 lg:w-64 bg-white border-r border-gray-200 flex flex-col justify-between z-20">
+        <aside class="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col justify-between z-20">
             <div class="flex-1">
                 <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-100"><span class="font-black text-xl text-red-600 italic">Z先森</span></div>
                 <nav class="py-4 space-y-1">
@@ -476,9 +476,9 @@
                 </div>
             </header>
             
-            <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
-                <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
-                    <div class="flex-1 overflow-y-auto p-6 space-y-8 thin-scrollbar"> <div>
+            <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-auto lg:h-full lg:overflow-hidden">
+    <div class="w-full lg:w-[420px] bg-white lg:border-r border-gray-200 flex flex-col z-10 shadow-none lg:shadow-lg shrink-0">
+        <div class="flex-1 p-6 space-y-8 lg:overflow-y-auto thin-scrollbar">
                             <label class="font-bold text-sm text-slate-800 flex justify-between mb-3 items-center">
                                 <span>风格滤镜</span>
                                 <span id="style-name" class="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded">默认</span>
@@ -630,6 +630,20 @@
             </div>
 
         </main>
+        <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-16 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+    <button onclick="switchTab('create')" id="mob-tab-create" class="flex flex-col items-center justify-center w-full h-full text-red-600">
+        <span class="text-xl mb-0.5">🎨</span>
+        <span class="text-[10px] font-bold">创作</span>
+    </button>
+    <button onclick="switchTab('gallery')" id="mob-tab-gallery" class="flex flex-col items-center justify-center w-full h-full text-gray-400">
+        <span class="text-xl mb-0.5">📂</span>
+        <span class="text-[10px] font-bold">画廊</span>
+    </button>
+    <button onclick="switchTab('profile')" id="mob-tab-profile" class="flex flex-col items-center justify-center w-full h-full text-gray-400">
+        <span class="text-xl mb-0.5">👤</span>
+        <span class="text-[10px] font-bold">我的</span>
+    </button>
+</div>
     </div>
 
     <script>
@@ -1226,8 +1240,42 @@
             }
         }
         
-        function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
+       function switchTab(t) { 
+    ['create','gallery','profile'].forEach(v=>{
+        // 1. 隐藏视图
+        document.getElementById('view-'+v).classList.add('hidden');
+        
+        // 2. 重置电脑端侧边栏样式
+        const pcTab = document.getElementById('tab-'+v);
+        if(pcTab) pcTab.classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600');
+        
+        // 3. 重置手机端底部栏样式 (新增)
+        const mobTab = document.getElementById('mob-tab-'+v);
+        if(mobTab) {
+            mobTab.classList.remove('text-red-600');
+            mobTab.classList.add('text-gray-400');
+        }
+    }); 
 
+    // 激活当前视图
+    document.getElementById('view-'+t).classList.remove('hidden');
+    
+    // 激活电脑端样式
+    const activePcTab = document.getElementById('tab-'+t);
+    if(activePcTab) activePcTab.classList.add('text-red-600','bg-red-50','border-r-2','border-red-600');
+
+    // 激活手机端样式 (新增)
+    const activeMobTab = document.getElementById('mob-tab-'+t);
+    if(activeMobTab) {
+        activeMobTab.classList.remove('text-gray-400');
+        activeMobTab.classList.add('text-red-600');
+    }
+
+    if(t==='gallery') loadGallery(true); 
+    
+    // 手机端切换后自动滚回顶部
+    window.scrollTo(0,0);
+}
         // --- 6.11 意见反馈逻辑 ---
         async function submitFeedback() {
             const btn = document.getElementById('btn-submit-feedback');
@@ -1340,6 +1388,7 @@
     </script>
 </body>
 </html>
+
 
 
 
