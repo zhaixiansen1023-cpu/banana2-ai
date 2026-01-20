@@ -1319,66 +1319,67 @@
                 btn.disabled = false;
             }
         }
-        // ==========================================
-    //  新增：零成本 AI 本地放大逻辑 (Copy Paste)
+       // ==========================================
+    //  🚀 智能防弹版：AI 本地放大逻辑
     // ==========================================
     
-    let upscalerEngine = null; // 存放我们的“渲染引擎”
+    let upscalerEngine = null; 
 
-    // 1. 页面加载完，静默初始化引擎
-    window.addEventListener('load', async () => {
-        console.log("正在预热 AI 放大引擎...");
-        // 初始化一个 2倍放大的模型，速度快，适合浏览器跑
-        upscalerEngine = new Upscaler({
-            model: {
-                scale: 2, 
-            }
+    // 辅助函数：尝试初始化引擎
+    function initEngine() {
+        if (typeof Upscaler === 'undefined') {
+            throw new Error("AI组件未加载！可能是网络拦截了 CDN 链接。");
+        }
+        return new Upscaler({
+            model: { scale: 2 } 
         });
-    });
+    }
 
-    // 2. 点击按钮后触发的函数
+    // 主函数
     async function handleLocalUpscale() {
         const imgEl = document.getElementById('lightbox-img');
         const btn = document.getElementById('btn-upscale');
         const statusEl = document.getElementById('upscale-status');
         const percentEl = document.getElementById('upscale-percent');
         
-        // 防止没有图或者正在跑
         if (!imgEl.src || btn.disabled) return;
 
-        // UI 变身：锁定按钮，显示进度条
+        // UI 状态更新
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.classList.add('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = `<span>⏳</span> 正在运算...`;
-        statusEl.classList.remove('hidden');
-
+        
         try {
-            // 开始跑 AI 运算
-            // patchSize: 64 意思是把图切成小块处理，防止把浏览器卡死
+            // 🔴 关键修改：点击时才检查引擎在不在
+            if (!upscalerEngine) {
+                btn.innerHTML = `<span>🔄</span> 正在启动引擎...`;
+                upscalerEngine = initEngine(); // 尝试启动
+            }
+
+            btn.innerHTML = `<span>⏳</span> 正在运算...`;
+            statusEl.classList.remove('hidden');
+
+            // 开始放大
             const upscaledSrc = await upscalerEngine.upscale(imgEl.src, {
                 patchSize: 64,
                 padding: 5,
                 progress: (amount) => {
-                    // 更新百分比数字
                     percentEl.innerText = Math.round(amount * 100);
                 }
             });
 
-            // 运算完成！替换图片显示
+            // 成功！
             imgEl.src = upscaledSrc;
-            
-            // 同时也让下载按钮下载这张高清图
             const downloadBtn = document.getElementById('lightbox-download');
             downloadBtn.onclick = () => downloadImage(upscaledSrc);
 
-            alert("✅ 放大完成！画质已增强 2 倍。");
+            alert("✅ 放大完成！请立即点击下载保存。");
 
         } catch (err) {
             console.error(err);
-            alert("❌ 放大失败：可能是图片太大，或者你的显卡显存不足。");
+            // 这里的报错会直接告诉你是不是 CDN 没加载上
+            alert("❌ 失败: " + err.message + "\n\n请检查网络或更换 <script> 源。");
         } finally {
-            // 恢复按钮状态
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
             btn.innerHTML = originalText;
@@ -1388,6 +1389,7 @@
     </script>
 </body>
 </html>
+
 
 
 
