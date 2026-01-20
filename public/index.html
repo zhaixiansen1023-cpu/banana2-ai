@@ -363,7 +363,7 @@
         }
     </style>
 </head>
-<body class="min-h-screen lg:h-screen lg:overflow-hidden overflow-auto text-slate-700 bg-slate-50 pb-20 lg:pb-0">
+<body class="h-screen w-screen overflow-auto lg:overflow-hidden text-slate-700 bg-slate-50">
 
     <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center p-4">
         <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white text-4xl">&times;</button>
@@ -452,8 +452,8 @@
         </div>
     </div>
 
-    <div id="app-view" class="h-screen flex hidden">
-        <aside class="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col justify-between z-20">
+    <div id="app-view" class="min-h-screen lg:h-screen w-full flex flex-col lg:flex-row hidden relative">
+        <aside class="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col justify-between z-20 h-full shrink-0">
             <div class="flex-1">
                 <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-100"><span class="font-black text-xl text-red-600 italic">Z先森</span></div>
                 <nav class="py-4 space-y-1">
@@ -476,8 +476,8 @@
                 </div>
             </header>
             
-            <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-auto lg:h-full lg:overflow-hidden">
-    <div class="w-full lg:w-[420px] bg-white lg:border-r border-gray-200 flex flex-col z-10 shadow-none lg:shadow-lg shrink-0">
+          <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-auto lg:h-full lg:overflow-hidden relative pb-20 lg:pb-0">
+   <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-sm shrink-0 h-auto lg:h-full">
         <div class="flex-1 p-6 space-y-8 lg:overflow-y-auto thin-scrollbar">
                             <label class="font-bold text-sm text-slate-800 flex justify-between mb-3 items-center">
                                 <span>风格滤镜</span>
@@ -1389,6 +1389,7 @@
     </script>
 </body>
 </html>
+
 
 
 
