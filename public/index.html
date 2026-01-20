@@ -7,8 +7,6 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/upscaler@latest/dist/browser/upscaler.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
@@ -363,20 +361,15 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen overflow-auto lg:overflow-hidden text-slate-700 bg-slate-50">
+<body class="h-screen overflow-hidden text-slate-700 bg-slate-50">
 
     <div id="lightbox" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center p-4">
         <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white/50 hover:text-white text-4xl">&times;</button>
         <img id="lightbox-img" class="max-w-full max-h-[85vh] rounded shadow-2xl object-contain">
-        <div class="flex gap-4 mt-6 items-center">
-    <button id="btn-upscale" onclick="handleLocalUpscale()" class="px-6 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-bold text-sm hover:shadow-lg hover:scale-105 transition flex items-center gap-2">
-        <span>✨</span> AI 本地精修 (免费)
-    </button>
-
-    <button id="lightbox-download" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer">下载原图</button>
-    <button id="lightbox-del-btn" class="px-6 py-2 bg-red-600/20 text-red-500 border border-red-600/50 rounded-full font-bold text-sm hover:bg-red-600 hover:text-white transition">删除</button>
-</div>
-<div id="upscale-status" class="text-white text-xs mt-2 hidden">正在利用显卡加速运算... <span id="upscale-percent">0</span>%</div>
+        <div class="flex gap-4 mt-6">
+            <button id="lightbox-download" class="px-6 py-2 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer">下载原图</button>
+            <button id="lightbox-del-btn" class="px-6 py-2 bg-red-600/20 text-red-500 border border-red-600/50 rounded-full font-bold text-sm hover:bg-red-600 hover:text-white transition">删除</button>
+        </div>
     </div>
 
     <div id="batch-bar" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-white shadow-2xl border border-gray-200 rounded-full px-6 py-3 flex items-center gap-6 hidden transform transition-all duration-300 translate-y-20">
@@ -452,8 +445,8 @@
         </div>
     </div>
 
-    <div id="app-view" class="min-h-screen lg:h-screen w-full flex flex-col lg:flex-row hidden relative">
-        <aside class="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col justify-between z-20 h-full shrink-0">
+    <div id="app-view" class="h-screen flex hidden">
+        <aside class="w-20 lg:w-64 bg-white border-r border-gray-200 flex flex-col justify-between z-20">
             <div class="flex-1">
                 <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-100"><span class="font-black text-xl text-red-600 italic">Z先森</span></div>
                 <nav class="py-4 space-y-1">
@@ -476,9 +469,9 @@
                 </div>
             </header>
             
-          <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-auto lg:h-full lg:overflow-hidden relative pb-20 lg:pb-0">
-   <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-sm shrink-0 h-auto lg:h-full">
-        <div class="flex-1 p-6 space-y-8 lg:overflow-y-auto thin-scrollbar">
+            <div id="view-create" class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+                <div class="w-full lg:w-[420px] bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg">
+                    <div class="flex-1 overflow-y-auto p-6 space-y-8 thin-scrollbar"> <div>
                             <label class="font-bold text-sm text-slate-800 flex justify-between mb-3 items-center">
                                 <span>风格滤镜</span>
                                 <span id="style-name" class="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded">默认</span>
@@ -630,20 +623,6 @@
             </div>
 
         </main>
-        <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-16 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-    <button onclick="switchTab('create')" id="mob-tab-create" class="flex flex-col items-center justify-center w-full h-full text-red-600">
-        <span class="text-xl mb-0.5">🎨</span>
-        <span class="text-[10px] font-bold">创作</span>
-    </button>
-    <button onclick="switchTab('gallery')" id="mob-tab-gallery" class="flex flex-col items-center justify-center w-full h-full text-gray-400">
-        <span class="text-xl mb-0.5">📂</span>
-        <span class="text-[10px] font-bold">画廊</span>
-    </button>
-    <button onclick="switchTab('profile')" id="mob-tab-profile" class="flex flex-col items-center justify-center w-full h-full text-gray-400">
-        <span class="text-xl mb-0.5">👤</span>
-        <span class="text-[10px] font-bold">我的</span>
-    </button>
-</div>
     </div>
 
     <script>
@@ -1240,42 +1219,8 @@
             }
         }
         
-       function switchTab(t) { 
-    ['create','gallery','profile'].forEach(v=>{
-        // 1. 隐藏视图
-        document.getElementById('view-'+v).classList.add('hidden');
-        
-        // 2. 重置电脑端侧边栏样式
-        const pcTab = document.getElementById('tab-'+v);
-        if(pcTab) pcTab.classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600');
-        
-        // 3. 重置手机端底部栏样式 (新增)
-        const mobTab = document.getElementById('mob-tab-'+v);
-        if(mobTab) {
-            mobTab.classList.remove('text-red-600');
-            mobTab.classList.add('text-gray-400');
-        }
-    }); 
+        function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
 
-    // 激活当前视图
-    document.getElementById('view-'+t).classList.remove('hidden');
-    
-    // 激活电脑端样式
-    const activePcTab = document.getElementById('tab-'+t);
-    if(activePcTab) activePcTab.classList.add('text-red-600','bg-red-50','border-r-2','border-red-600');
-
-    // 激活手机端样式 (新增)
-    const activeMobTab = document.getElementById('mob-tab-'+t);
-    if(activeMobTab) {
-        activeMobTab.classList.remove('text-gray-400');
-        activeMobTab.classList.add('text-red-600');
-    }
-
-    if(t==='gallery') loadGallery(true); 
-    
-    // 手机端切换后自动滚回顶部
-    window.scrollTo(0,0);
-}
         // --- 6.11 意见反馈逻辑 ---
         async function submitFeedback() {
             const btn = document.getElementById('btn-submit-feedback');
@@ -1319,80 +1264,9 @@
                 btn.disabled = false;
             }
         }
-       // ==========================================
-    //  🚀 智能防弹版：AI 本地放大逻辑
-    // ==========================================
-    
-    let upscalerEngine = null; 
-
-    // 辅助函数：尝试初始化引擎
-    function initEngine() {
-        if (typeof Upscaler === 'undefined') {
-            throw new Error("AI组件未加载！可能是网络拦截了 CDN 链接。");
-        }
-        return new Upscaler({
-            model: { scale: 2 } 
-        });
-    }
-
-    // 主函数
-    async function handleLocalUpscale() {
-        const imgEl = document.getElementById('lightbox-img');
-        const btn = document.getElementById('btn-upscale');
-        const statusEl = document.getElementById('upscale-status');
-        const percentEl = document.getElementById('upscale-percent');
-        
-        if (!imgEl.src || btn.disabled) return;
-
-        // UI 状态更新
-        const originalText = btn.innerHTML;
-        btn.disabled = true;
-        btn.classList.add('opacity-50', 'cursor-not-allowed');
-        
-        try {
-            // 🔴 关键修改：点击时才检查引擎在不在
-            if (!upscalerEngine) {
-                btn.innerHTML = `<span>🔄</span> 正在启动引擎...`;
-                upscalerEngine = initEngine(); // 尝试启动
-            }
-
-            btn.innerHTML = `<span>⏳</span> 正在运算...`;
-            statusEl.classList.remove('hidden');
-
-            // 开始放大
-            const upscaledSrc = await upscalerEngine.upscale(imgEl.src, {
-                patchSize: 64,
-                padding: 5,
-                progress: (amount) => {
-                    percentEl.innerText = Math.round(amount * 100);
-                }
-            });
-
-            // 成功！
-            imgEl.src = upscaledSrc;
-            const downloadBtn = document.getElementById('lightbox-download');
-            downloadBtn.onclick = () => downloadImage(upscaledSrc);
-
-            alert("✅ 放大完成！请立即点击下载保存。");
-
-        } catch (err) {
-            console.error(err);
-            // 这里的报错会直接告诉你是不是 CDN 没加载上
-            alert("❌ 失败: " + err.message + "\n\n请检查网络或更换 <script> 源。");
-        } finally {
-            btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            btn.innerHTML = originalText;
-            statusEl.classList.add('hidden');
-        }
-    }
     </script>
 </body>
 </html>
-
-
-
-
 
 
 
