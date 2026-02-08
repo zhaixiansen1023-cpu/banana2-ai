@@ -1,4 +1,4 @@
-const FormData = require('form-data');
+const FormData = require('form-data'); // ✅ 必须确保 package.json 里有 "form-data": "^4.0.0"
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const https = require('https');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080; // Zeabur 通常使用 8080，这里保留你的逻辑
 
 // ==================================================================
 // 🔍 1. 启动检查与数据库连接
@@ -39,10 +39,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Multipart Fix)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Multipart Fixed)...'));
 
 // ==================================================================
-// 🟢 2. 模型配置
+// 🟢 2. 模型配置 (完全保留你的配置)
 // ==================================================================
 const MODEL_REGISTRY = {
     'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
@@ -54,66 +54,96 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (最终兼容稳健版)
+// 🔵 3. 异步引擎 (🔥核心修复：使用库 + 显式长度)
 // ==================================================================
-function generateMultipartBody(fields) {
-    // 使用随机 Boundary
-    const boundary = 'BananaBoundary-' + Date.now().toString(16);
-    const crlf = '\r\n';
-    const chunks = [];
+async function handleAsyncGeneration(body, apiPath) {
+    const baseUrl = "https://api.tu-zi.com";
+    
+    // 1. 创建标准的 FormData 对象 (不再手动拼接字符串)
+    const form = new FormData();
+    
+    // 2. 添加基础参数
+    form.append('model', body.model);
+    form.append('prompt', body.prompt);
+    // 注意：有些模型可能需要严格的宽高比字符串
+    form.append('size', body.size || "16:9"); 
 
-    for (const [key, value] of Object.entries(fields)) {
-        if (value === undefined || value === null) continue;
-
-        const values = Array.isArray(value) ? value : [value];
-
-        values.forEach((item, index) => {
-            let partData = item;
-            // 基础 Header
-            let partHeaders = [`Content-Disposition: form-data; name="${key}"`];
-
-            // 识别图片 DataURL
-            if (key === 'image' && typeof item === 'string' && item.startsWith('data:')) {
-                const commaIndex = item.indexOf(',');
-                const semicolonIndex = item.indexOf(';');
-                const colonIndex = item.indexOf(':');
-
-                if (commaIndex > 0 && semicolonIndex > colonIndex) {
-                    const mimeType = item.substring(colonIndex + 1, semicolonIndex);
+    // 3. 处理图片 (支持多图 + Base64自动转二进制)
+    if (body.images && body.images.length > 0) {
+        body.images.forEach((imgStr, index) => {
+            if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
+                // 解析 Base64
+                const matches = imgStr.match(/^data:(.+);base64,(.+)$/);
+                if (matches) {
+                    const mimeType = matches[1];
+                    const buffer = Buffer.from(matches[2], 'base64');
                     const ext = mimeType.split('/')[1] || 'png';
                     
-                    // [修改] 仅保留 filename 和 Content-Type，移除 Content-Transfer-Encoding 以提高兼容性
-                    partHeaders[0] += `; filename="image_${index}.${ext}"`;
-                    partHeaders.push(`Content-Type: ${mimeType}`);
-                    
-                    // 提取二进制数据
-                    const base64Str = item.substring(commaIndex + 1);
-                    partData = Buffer.from(base64Str, 'base64');
+                    // 添加到表单
+                    form.append('image', buffer, { 
+                        filename: `image_${index}.${ext}`,
+                        contentType: mimeType,
+                        knownLength: buffer.length // 显式告知库文件大小
+                    });
                 }
             }
-
-            chunks.push(Buffer.from(`--${boundary}${crlf}`));
-            chunks.push(Buffer.from(partHeaders.join(crlf) + crlf + crlf));
-            
-            if (Buffer.isBuffer(partData)) {
-                chunks.push(partData);
-            } else {
-                chunks.push(Buffer.from(String(partData)));
-            }
-            chunks.push(Buffer.from(crlf));
         });
     }
-    // 结尾边界
-    chunks.push(Buffer.from(`--${boundary}--${crlf}`));
 
-    return {
-        boundary,
-        body: Buffer.concat(chunks)
+    // 4. [🔥关键步骤] 获取整个表单的准确字节长度
+    // 这一步是解决 "NextPart: EOF" 错误的核心
+    const getLength = (formData) => {
+        return new Promise((resolve, reject) => {
+            formData.getLength((err, length) => {
+                if (err) reject(err);
+                else resolve(length);
+            });
+        });
     };
+
+    const contentLength = await getLength(form);
+
+    // 5. 提交请求
+    const submitRes = await fetch(`${baseUrl}${apiPath}`, {
+        method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${process.env.API_KEY}`,
+            ...form.getHeaders(),       // 让库自动生成正确的 Boundary
+            'Content-Length': contentLength // 🔥 必须加上这行，禁止分块传输
+        },
+        body: form,
+        agent: ignoreSSL
+    });
+
+    if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
+    const taskData = await submitRes.json();
+    const taskId = taskData.id;
+
+    // 6. 轮询等待
+    let attempts = 0;
+    while (attempts < 60) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempts++;
+        const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
+            headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
+            agent: ignoreSSL
+        });
+        
+        if (!checkRes.ok) continue;
+        const statusData = await checkRes.json();
+        
+        if (statusData.status === 'completed' || statusData.status === 'succeeded') {
+            // 兼容不同的返回字段
+            return statusData.video_url || statusData.url || (statusData.images && statusData.images[0]?.url);
+        } else if (statusData.status === 'failed') {
+            throw new Error(`生成失败: ${JSON.stringify(statusData)}`);
+        }
+    }
+    throw new Error("生成超时");
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口
+// 🟢 4. 统一调度接口 (完全保留你的逻辑)
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -141,6 +171,7 @@ app.post('/api/proxy', async (req, res) => {
         if (creditError) return res.status(402).json({ error: { message: "积分不足" } });
 
         let resultUrl = "";
+        // 这里会把 config.path (即 /v1/videos) 传给 handleAsyncGeneration
         if (config.type === 'async') {
             resultUrl = await handleAsyncGeneration(req.body, config.path);
         } else {
@@ -159,78 +190,7 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 5. 异步引擎 (使用官方推荐的 standard library 修复 EOF 问题)
-// ==================================================================
-async function handleAsyncGeneration(body, apiPath) {
-    const baseUrl = "https://api.tu-zi.com";
-    
-    // 创建标准的 FormData 对象
-    const form = new FormData();
-    
-    // 添加基础参数
-    form.append('model', body.model);
-    form.append('prompt', body.prompt);
-    form.append('size', body.size || "16:9");
-
-    // 处理图片 (直接支持 Base64 转换)
-    if (body.images && body.images.length > 0) {
-        body.images.forEach((imgStr, index) => {
-            if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
-                // 解析 Base64
-                const matches = imgStr.match(/^data:(.+);base64,(.+)$/);
-                if (matches) {
-                    const mimeType = matches[1];
-                    const buffer = Buffer.from(matches[2], 'base64');
-                    // 必须指定 filename，否则服务端可能无法识别为文件
-                    const ext = mimeType.split('/')[1] || 'png';
-                    form.append('image', buffer, { // 注意：大多数 API 期望的字段名是 'image' 或 'file'
-                        filename: `image_${index}.${ext}`,
-                        contentType: mimeType
-                    });
-                }
-            }
-        });
-    }
-
-    // 提交任务
-    // 注意：form.getHeaders() 会自动生成正确的 Boundary 和 Content-Type
-    const submitRes = await fetch(`${baseUrl}${apiPath}`, {
-        method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${process.env.API_KEY}`,
-            ...form.getHeaders() // <--- 关键：让库自动生成 Headers
-        },
-        body: form,
-        agent: ignoreSSL
-    });
-
-    if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
-    const taskData = await submitRes.json();
-    const taskId = taskData.id;
-
-    // 轮询等待 (保持原有逻辑)
-    let attempts = 0;
-    while (attempts < 60) {
-        await new Promise(r => setTimeout(r, 2000));
-        attempts++;
-        const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
-            headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
-            agent: ignoreSSL
-        });
-        
-        if (!checkRes.ok) continue;
-        const statusData = await checkRes.json();
-        
-        if (statusData.status === 'completed' || statusData.status === 'succeeded') {
-            return statusData.video_url || statusData.url; // 兼容视频和图片返回字段
-        } else if (statusData.status === 'failed') {
-            throw new Error(`生成失败: ${statusData.error || '未知错误'}`);
-        }
-    }
-    throw new Error("生成超时");
-}
-// ==================================================================
-// 🟠 6. 同步引擎 (保持 JSON 发送)
+// 🟠 5. 同步引擎 (保持不变)
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
     const baseUrl = "https://api.tu-zi.com"; 
@@ -297,9 +257,3 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
-
-
-
-
-
-
