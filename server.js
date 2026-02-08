@@ -27,7 +27,11 @@ if (missingEnv.length > 0) {
     }
 }
 
-const ignoreSSL = new https.Agent({ rejectUnauthorized: false });
+// [修改] 开启 keepAlive，防止大文件上传时连接中断
+const ignoreSSL = new https.Agent({ 
+    rejectUnauthorized: false,
+    keepAlive: true 
+});
 const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -49,11 +53,11 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (内存优化 + 兼容性增强版)
+// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (最终兼容稳健版)
 // ==================================================================
 function generateMultipartBody(fields) {
-    // [优化] 使用更简单的 Boundary 字符串，避免某些服务器解析出错
-    const boundary = 'BananaBoundary' + Date.now().toString(16);
+    // 使用随机 Boundary
+    const boundary = 'BananaBoundary-' + Date.now().toString(16);
     const crlf = '\r\n';
     const chunks = [];
 
@@ -64,9 +68,10 @@ function generateMultipartBody(fields) {
 
         values.forEach((item, index) => {
             let partData = item;
+            // 基础 Header
             let partHeaders = [`Content-Disposition: form-data; name="${key}"`];
 
-            // 处理 Base64 图片
+            // 识别图片 DataURL
             if (key === 'image' && typeof item === 'string' && item.startsWith('data:')) {
                 const commaIndex = item.indexOf(',');
                 const semicolonIndex = item.indexOf(';');
@@ -76,11 +81,9 @@ function generateMultipartBody(fields) {
                     const mimeType = item.substring(colonIndex + 1, semicolonIndex);
                     const ext = mimeType.split('/')[1] || 'png';
                     
-                    // 构造文件头
+                    // [修改] 仅保留 filename 和 Content-Type，移除 Content-Transfer-Encoding 以提高兼容性
                     partHeaders[0] += `; filename="image_${index}.${ext}"`;
                     partHeaders.push(`Content-Type: ${mimeType}`);
-                    // [新增] 显式声明传输编码，防止乱码或解析错误
-                    partHeaders.push(`Content-Transfer-Encoding: binary`);
                     
                     // 提取二进制数据
                     const base64Str = item.substring(commaIndex + 1);
@@ -94,12 +97,12 @@ function generateMultipartBody(fields) {
             if (Buffer.isBuffer(partData)) {
                 chunks.push(partData);
             } else {
-                // 确保文本字段也是 Buffer
                 chunks.push(Buffer.from(String(partData)));
             }
             chunks.push(Buffer.from(crlf));
         });
     }
+    // 结尾边界
     chunks.push(Buffer.from(`--${boundary}--${crlf}`));
 
     return {
@@ -155,7 +158,7 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 5. 异步引擎 (修复 EOF 问题的关键：显式 Content-Length)
+// 🔵 5. 异步引擎 (兼容性修复：Boundary 加引号 + KeepAlive)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
@@ -176,16 +179,18 @@ async function handleAsyncGeneration(body, apiPath) {
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
-            'Content-Type': `multipart/form-data; boundary=${boundary}`,
-            // [🚩核心修复] 显式指定内容长度，禁用 Chunked 传输，解决 EOF 报错
+            // [修改] 这里的 boundary 值加上双引号，这是某些严格服务器的要求
+            'Content-Type': `multipart/form-data; boundary="${boundary}"`,
             'Content-Length': multipartData.length.toString(),
             'Authorization': `Bearer ${process.env.API_KEY}` 
         },
         body: multipartData,
-        agent: ignoreSSL
+        agent: ignoreSSL // 确保这里使用了开启 keepAlive 的 agent
     });
 
     if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
+    
+    // ... 后面的轮询逻辑保持不变 ...
     const taskData = await submitRes.json();
     const taskId = taskData.id;
 
@@ -210,7 +215,6 @@ async function handleAsyncGeneration(body, apiPath) {
     }
     throw new Error("生成超时");
 }
-
 // ==================================================================
 // 🟠 6. 同步引擎 (保持 JSON 发送)
 // ==================================================================
@@ -279,6 +283,7 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
 
 
 
