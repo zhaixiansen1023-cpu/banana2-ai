@@ -6,38 +6,33 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const https = require('https');
 
-// ==================================================================
-// 🟢 1. 模型注册表 (以后换模型，只改这里！)
-// ==================================================================
-const MODEL_REGISTRY = {
-    // --- 异步模型 (对应 /v1/videos 路径) ---
-    'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
-    'gemini-3-pro-image-preview-2k-async': { type: 'async', path: '/v1/videos', cost: 10 },
-    'gemini-3-pro-image-preview-4k-async': { type: 'async', path: '/v1/videos', cost: 15 },
-
-    // --- 同步模型 (对应 /v1/images/generations) ---
-    // 如果你想用gpt-image-1.5 ，可以在这里开启
-    'gemini-3-pro-image-preview':          { type: 'sync',  path: '/v1/images/generations', cost: 5 },
-    'gpt-image-1.5':                            { type: 'sync',  path: '/v1/images/generations', cost: 20 },
-    
-    // --- 默认配置 (防崩) ---
-    'default':                             { type: 'async', path: '/v1/videos', cost: 5 }
-};
-
 const app = express();
 const port = process.env.PORT || 3000;
 
-// --- 环境变量检查 ---
-const requiredEnv = ['API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
-if (requiredEnv.some(key => !process.env[key])) {
-    console.error("❌ 严重错误: 缺少环境变量");
-}
+// ==================================================================
+// 🔍 1. 启动检查与数据库连接 (防崩溃处理)
+// ==================================================================
+let supabase = null; // 先设为空，防止初始化失败导致程序崩溃
 
-// 初始化 Supabase
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
+const requiredEnv = ['API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+const missingEnv = requiredEnv.filter(key => !process.env[key]);
+
+// 如果缺变量，只报错，不崩溃
+if (missingEnv.length > 0) {
+    console.error(`\n❌❌❌ [启动警告] 缺少环境变量: ${missingEnv.join(', ')} ❌❌❌`);
+    console.error(`请在 Zeabur 环境变量设置中添加它们。在添加之前，生成功能将无法使用。\n`);
+} else {
+    // 只有变量全的时候才尝试连接
+    try {
+        supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_KEY
+        );
+        console.log('✅ Supabase 数据库连接成功');
+    } catch (err) {
+        console.error('❌ Supabase 初始化失败:', err.message);
+    }
+}
 
 // 忽略 SSL 证书错误 (针对某些 API 证书问题)
 const ignoreSSL = new https.Agent({ rejectUnauthorized: false });
@@ -49,12 +44,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Universal Proxy Running (V7.3 Complete)...'));
+// 健康检查接口
+app.get('/', (req, res) => res.send('Z-AI Proxy Server is Running...'));
 
 // ==================================================================
-// 🟢 2. 统一调度接口 (The Manager)
+// 🟢 2. 模型注册表
+// ==================================================================
+const MODEL_REGISTRY = {
+    'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
+    'gemini-3-pro-image-preview-2k-async': { type: 'async', path: '/v1/videos', cost: 10 },
+    'gemini-3-pro-image-preview-4k-async': { type: 'async', path: '/v1/videos', cost: 15 },
+    'gemini-3-pro-image-preview':          { type: 'sync',  path: '/v1/images/generations', cost: 5 },
+    'dall-e-3':                            { type: 'sync',  path: '/v1/images/generations', cost: 20 },
+    'default':                             { type: 'async', path: '/v1/videos', cost: 5 }
+};
+
+// ==================================================================
+// 🟢 3. 统一调度接口
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
+    // 🚨 第一道防线：如果服务器没连上数据库，直接拦截
+    if (!supabase) {
+        return res.status(500).json({ 
+            error: { message: "服务器环境变量未配置，无法连接数据库。" } 
+        });
+    }
+
     let userForRefund = null;
     let costForRefund = 0;
 
@@ -65,7 +80,7 @@ app.post('/api/proxy', async (req, res) => {
         const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1]);
         if (authError || !user) return res.status(403).json({ error: { message: "Invalid Token" } });
 
-        // 2. 查表决定处理方式
+        // 2. 查表
         const modelName = req.body.model;
         const config = MODEL_REGISTRY[modelName] || MODEL_REGISTRY['default'];
         
@@ -73,34 +88,30 @@ app.post('/api/proxy', async (req, res) => {
         costForRefund = cost;
         userForRefund = user;
 
-        console.log(`🤖 Model: ${modelName} | Mode: ${config.type.toUpperCase()} | Cost: ${cost}`);
+        console.log(`🤖 Model: ${modelName} | Mode: ${config.type.toUpperCase()} | User: ${user.email}`);
 
         // 3. 扣费
         const { error: creditError } = await supabase.rpc('decrement_credits', { count: cost, x_user_id: user.id });
-        if (creditError) return res.status(402).json({ error: { message: "积分不足，请充值" } });
+        if (creditError) return res.status(402).json({ error: { message: "积分不足" } });
 
         // 4. 分流处理
         let resultUrl = "";
         
         if (config.type === 'async') {
-            // 走异步轮询通道
             resultUrl = await handleAsyncGeneration(req.body, config.path);
         } else {
-            // 走同步直连通道 (带 Base64 转存功能)
             resultUrl = await handleSyncGeneration(req.body, config.path, user.id);
         }
 
-        // 5. 返回统一格式
         res.status(200).json({
             created: Date.now(),
             data: [{ url: resultUrl }]
         });
 
     } catch (error) {
-        console.error("❌ Proxy Error:", error.message);
+        console.error("❌ Error:", error.message);
         // 自动退款
-        if (userForRefund) {
-            console.log(`💸 执行退款: ${costForRefund} 积分`);
+        if (userForRefund && supabase) {
             await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
         }
         res.status(500).json({ error: { message: error.message || "Server Error" } });
@@ -108,13 +119,12 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 3. 异步处理引擎 (Async Engine)
+// 🔵 4. 异步引擎
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
     // 提交任务
-    // 注意：如果是异步模型，我们忽略 body.images，因为新接口暂时不支持传图
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.API_KEY}` },
@@ -132,7 +142,7 @@ async function handleAsyncGeneration(body, apiPath) {
 
     // 轮询等待
     let attempts = 0;
-    while (attempts < 60) { // 最多等 2 分钟
+    while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
         attempts++;
         
@@ -147,24 +157,21 @@ async function handleAsyncGeneration(body, apiPath) {
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
             return statusData.video_url || statusData.url;
         } else if (statusData.status === 'failed') {
-            throw new Error("API 报告生成失败");
+            throw new Error("生成失败");
         }
     }
-    throw new Error("生成超时，请稍后重试");
+    throw new Error("生成超时");
 }
 
 // ==================================================================
-// 🟠 4. 同步处理引擎 (Sync Engine)
+// 🟠 5. 同步引擎
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
     const baseUrl = "https://api.tu-zi.com"; 
-
-    // 尺寸转换
     let sizeParam = "1024x1024";
     if (body.size === "16:9") sizeParam = "1792x1024";
     else if (body.size === "3:4") sizeParam = "1024x1792";
 
-    // 构造 Payload (支持垫图)
     const payload = {
         model: body.model,
         prompt: body.prompt,
@@ -172,11 +179,6 @@ async function handleSyncGeneration(body, apiPath, userId) {
         n: 1,
         response_format: "url"
     };
-
-    // 如果前端传了图片 (images 数组)，且不为空，我们就把它塞进 prompt 或者对应字段
-    // 注意：Gemini 的同步接口处理图片的方式可能不同，这里仅作基础透传示例
-    // 具体的 API 如果支持 'input_image' 或 'image' 字段，请按需修改
-    // 目前大部分同步绘图 API (DALL-E 3) 不支持垫图，但如果有，这里可以扩展
 
     const res = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
@@ -188,47 +190,39 @@ async function handleSyncGeneration(body, apiPath, userId) {
     if (!res.ok) throw new Error(`生成失败: ${await res.text()}`);
     const data = await res.json();
     
-    // 优先找 URL，如果没有，找 b64_json 并转存
     if (data.data && data.data.length > 0) {
         const item = data.data[0];
         if (item.url) return item.url;
-
-        if (item.b64_json) {
-            console.log("⚠️ API 返回 Base64，正在转存...");
+        // 如果是 Base64，且数据库连接正常，才转存
+        if (item.b64_json && supabase) {
+            console.log("⚠️ 转存 Base64...");
             const buffer = Buffer.from(item.b64_json, 'base64');
             const fileName = `temp/${userId}/sync_${Date.now()}.png`;
-            
-            const { error } = await supabase.storage
-                .from('ai-images')
-                .upload(fileName, buffer, { contentType: 'image/png' });
-                
-            if (error) throw new Error("Base64 转存失败: " + error.message);
-            const { data: publicData } = supabase.storage
-                .from('ai-images')
-                .getPublicUrl(fileName);
+            const { error } = await supabase.storage.from('ai-images').upload(fileName, buffer, { contentType: 'image/png' });
+            if (error) throw new Error("转存失败");
+            const { data: publicData } = supabase.storage.from('ai-images').getPublicUrl(fileName);
             return publicData.publicUrl;
         }
     }
-
-    throw new Error("API 返回的数据格式无法识别");
+    throw new Error("无法识别返回格式");
 }
 
 // 前端路由
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(port, () => console.log(`Universal Proxy running on port ${port}`));
+app.listen(port, () => console.log(`✅ 服务器已启动 (Port ${port})`));
 
 // ==================================================================
-// 🧹 5. 自动清理任务 (已完整恢复)
+// 🧹 6. 自动清理任务 (完整逻辑)
 // ==================================================================
 cron.schedule('0 0 * * *', async () => {
+    if (!supabase) return;
     console.log('🕒 [自动任务] 开始深度清理 temp 文件夹...');
 
     const BUCKET_NAME = 'ai-images'; 
     const ROOT_FOLDER = 'temp';
 
     try {
-        // 1. 先列出 temp 下面有哪些“用户文件夹”
         const { data: userFolders, error: listError } = await supabase
             .storage
             .from(BUCKET_NAME)
@@ -243,14 +237,10 @@ cron.schedule('0 0 * * *', async () => {
 
         let totalFilesDeleted = 0;
 
-        // 2. 遍历每一个“用户文件夹”，把里面的图片找出来
         for (const folder of userFolders) {
-            // 跳过占位符文件
             if (folder.name === '.emptyFolderPlaceholder') continue;
-
             const userFolderPath = `${ROOT_FOLDER}/${folder.name}`;
             
-            // 钻进文件夹找图片
             const { data: files } = await supabase
                 .storage
                 .from(BUCKET_NAME)
@@ -258,8 +248,6 @@ cron.schedule('0 0 * * *', async () => {
 
             if (files && files.length > 0) {
                 const pathsToDelete = files.map(f => `${userFolderPath}/${f.name}`);
-                
-                // 执行删除
                 const { error: removeError } = await supabase
                     .storage
                     .from(BUCKET_NAME)
@@ -270,12 +258,8 @@ cron.schedule('0 0 * * *', async () => {
                 }
             }
         }
-
-        console.log(`✅ 清理完成！共删除了 ${totalFilesDeleted} 张临时图片，所有空文件夹已自动消失。`);
-
+        console.log(`✅ 清理完成！共删除了 ${totalFilesDeleted} 张临时图片。`);
     } catch (err) {
         console.error('❌ 清理失败:', err.message);
     }
 });
-
-
