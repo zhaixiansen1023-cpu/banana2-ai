@@ -18,7 +18,7 @@ const MODEL_REGISTRY = {
     // --- 同步模型 (对应 /v1/images/generations) ---
     // 如果你想用 DALL-E 3，可以在这里开启
     'gemini-3-pro-image-preview':          { type: 'sync',  path: '/v1/images/generations', cost: 5 },
-    'dall-e-3':                            { type: 'sync',  path: '/v1/images/generations', cost: 20 },
+    'gpt-image-1.5':                            { type: 'sync',  path: '/v1/images/generations', cost: 20 },
     
     // --- 默认配置 (防崩) ---
     'default':                             { type: 'async', path: '/v1/videos', cost: 5 }
@@ -277,3 +277,4 @@ cron.schedule('0 0 * * *', async () => {
         console.error('❌ 清理失败:', err.message);
     }
 });
+
