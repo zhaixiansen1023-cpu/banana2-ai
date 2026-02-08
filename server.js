@@ -57,7 +57,17 @@ function generateMultipartBody(fields) {
     const chunks = [];
 
     for (const [key, value] of Object.entries(fields)) {
-        if (value !== undefined && value !== null) {
+        if (value === undefined || value === null) continue;
+
+        // [升级] 支持数组：如果是数组，循环添加多个同名字段
+        if (Array.isArray(value)) {
+            value.forEach(item => {
+                chunks.push(Buffer.from(`--${boundary}${crlf}`));
+                chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${crlf}${crlf}`));
+                chunks.push(Buffer.from(`${item}${crlf}`));
+            });
+        } else {
+            // 原有逻辑：处理单个值
             chunks.push(Buffer.from(`--${boundary}${crlf}`));
             chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${crlf}${crlf}`));
             chunks.push(Buffer.from(`${value}${crlf}`));
@@ -129,6 +139,12 @@ async function handleAsyncGeneration(body, apiPath) {
         prompt: body.prompt,
         size: body.size || "16:9"
     };
+
+    // [升级] 支持多图：直接将图片数组传给 image 字段
+    // generateMultipartBody 函数会自动将其展开为多个 image 部分
+    if (body.images && body.images.length > 0) {
+        fields.image = body.images; 
+    }
 
     // 原生构建 Multipart 表单
     const { boundary, body: multipartData } = generateMultipartBody(fields);
@@ -238,3 +254,4 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
