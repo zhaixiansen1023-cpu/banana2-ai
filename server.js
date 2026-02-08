@@ -1,4 +1,4 @@
-const FormData = require('form-data'); // 必须确保 package.json 已包含 "form-data": "^4.0.0"
+const FormData = require('form-data');
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
@@ -28,18 +28,18 @@ if (missingEnv.length > 0) {
     }
 }
 
-// 开启 keepAlive
+// [修改] 彻底移除 keepAlive，改用默认设置 + 强制短连接
+// 这能有效解决 "Bad Gateway" 和连接复用导致的 EOF 问题
 const ignoreSSL = new https.Agent({ 
-    rejectUnauthorized: false,
-    keepAlive: true 
+    rejectUnauthorized: false
 });
 const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' })); // 确保能接收大图片
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Buffer Mode Fix)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Final Defense Mode)...'));
 
 // ==================================================================
 // 🟢 2. 模型配置
@@ -54,7 +54,7 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🔵 3. 异步引擎 (🔥杀手锏：强制 Buffer 模式，彻底杜绝 EOF)
+// 🔵 3. 异步引擎 (🔥缓冲区模式 + 安全解析 + 短连接)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
@@ -84,45 +84,73 @@ async function handleAsyncGeneration(body, apiPath) {
         });
     }
 
-    // 3. [🔥核心代码] 将整个 Form 流转换为单一 Buffer
-    // 这能强制 node-fetch 发送完整的数据包，而不是分块发送
-    // 从而解决 "NextPart: EOF" 错误
+    // 3. 转为 Buffer (防止 EOF)
     const formBuffer = await new Promise((resolve, reject) => {
         const chunks = [];
         form.on('data', (chunk) => chunks.push(chunk));
         form.on('end', () => resolve(Buffer.concat(chunks)));
         form.on('error', (err) => reject(err));
-        form.resume(); // 开始读取流
+        form.resume();
     });
 
     // 4. 提交任务
+    // [修复] 强制 Connection: close 防止网关 502
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
             'Authorization': `Bearer ${process.env.API_KEY}`,
-            ...form.getHeaders(), // 获取正确的 boundary
-            'Content-Length': formBuffer.length // 显式指定长度，这就是 Buffer 的优势
+            'Connection': 'close', // 🔥 关键：强制短连接
+            'Accept': 'application/json',
+            ...form.getHeaders(),
+            'Content-Length': formBuffer.length
         },
-        body: formBuffer, // 发送 Buffer，不要发送 form 对象
+        body: formBuffer,
         agent: ignoreSSL
     });
 
-    if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
-    const taskData = await submitRes.json();
-    const taskId = taskData.id;
+    // 5. [🔥核心修复] 安全解析响应
+    // 先读文本，再试着转 JSON，防止 "Unexpected token B" 崩溃
+    const responseText = await submitRes.text();
+    let taskData;
 
-    // 5. 轮询等待
+    try {
+        taskData = JSON.parse(responseText);
+    } catch (e) {
+        // 如果解析失败，说明服务器返回了 Bad Gateway 或其他 HTML 错误
+        throw new Error(`API 响应异常 (非JSON): ${responseText.substring(0, 200)}`); // 只截取前200字
+    }
+
+    if (!submitRes.ok) {
+        throw new Error(`提交失败 [${submitRes.status}]: ${JSON.stringify(taskData)}`);
+    }
+    
+    const taskId = taskData.id || taskData.data?.id; // 兼容不同字段
+    if (!taskId) throw new Error(`未获取到任务ID: ${responseText}`);
+
+    // 6. 轮询等待
     let attempts = 0;
     while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
         attempts++;
         const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
-            headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
+            headers: { 
+                'Authorization': `Bearer ${process.env.API_KEY}`,
+                'Connection': 'close' // 轮询也用短连接
+            },
             agent: ignoreSSL
         });
         
         if (!checkRes.ok) continue;
-        const statusData = await checkRes.json();
+        
+        // 同样的安全解析逻辑
+        const checkText = await checkRes.text();
+        let statusData;
+        try {
+            statusData = JSON.parse(checkText);
+        } catch (e) {
+            console.warn("轮询收到非JSON响应，跳过...");
+            continue;
+        }
         
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
             return statusData.video_url || statusData.url || (statusData.images && statusData.images[0]?.url);
@@ -134,7 +162,7 @@ async function handleAsyncGeneration(body, apiPath) {
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口 (逻辑保持不变)
+// 🟢 4. 统一调度接口 (保持不变)
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -203,9 +231,16 @@ async function handleSyncGeneration(body, apiPath, userId) {
         agent: ignoreSSL
     });
 
-    if (!res.ok) throw new Error(`生成失败: ${await res.text()}`);
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch(e) {
+        throw new Error(`同步接口错误 (非JSON): ${text.substring(0, 100)}`);
+    }
     
+    if (!res.ok) throw new Error(`生成失败: ${JSON.stringify(data)}`);
+
     if (data.data && data.data.length > 0) {
         const item = data.data[0];
         if (item.url) return item.url;
