@@ -625,13 +625,12 @@
         </main>
     </div>
 
-    <script>
+<script>
         // =======================================================
         // 1. 全局配置 (适配最新的异步模型)
         // =======================================================
         const SERVER_CONFIG = {
             MODELS: {
-                // 对应 server.js 里的异步模型配置
                 '1k': 'gemini-3-pro-image-preview-async',
                 '2k': 'gemini-3-pro-image-preview-2k-async',
                 '4k': 'gemini-3-pro-image-preview-4k-async'
@@ -645,13 +644,11 @@
         const db = createClient(SUPABASE_URL, SUPABASE_KEY);
         
         // --- 状态变量 ---
-        let refImages = []; // 垫图数据
+        let refImages = []; 
         let selectedRefIds = new Set();
         let isSelectMode = false; 
         let selectedIds = new Set();
         let currentLightboxId = null; 
-        let currentLightboxUrl = null; 
-        let currentLightboxPath = null;
         let currentStylePrompt = ""; 
         let abortController = null; 
 
@@ -727,7 +724,7 @@
         }
 
         // =======================================================
-        // 3. 核心生成逻辑 (✅ 适配异步 + ✅ 无限制垫图)
+        // 3. 核心生成逻辑
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -765,7 +762,7 @@
                     model: painterModelId, 
                     prompt: finalPrompt, 
                     size: aspectValue === 'original' ? '16:9' : aspectValue,
-                    images: imagesToSend // 发送图片数据
+                    images: imagesToSend
                 };
 
                 // 发送给后端代理
@@ -844,13 +841,11 @@
         }
 
         // =======================================================
-        // 4. 上传与垫图 (✅ 无限制版)
+        // 4. 上传与垫图 (✅ 修正版：ID 已改为 ref-tray)
         // =======================================================
         function handleImageUpload(input) {
             const files = input.files;
             if (!files.length) return;
-
-            // 🟢 我删掉了原来的数量检查，现在你想传多少传多少！
             
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
@@ -864,32 +859,23 @@
                 };
                 reader.readAsDataURL(file);
             });
-            input.value = ''; // 清空，允许重复上传
+            input.value = ''; 
         }
 
-       function renderRefTray() {
-            // 🔴 修正：这里原来写的是 'ref-image-tray'，改成了 'ref-tray'
+        function renderRefTray() {
+            // 🟢 关键修复：这里的 ID 必须和 HTML 里的 <div id="ref-tray"> 对应！
             const container = document.getElementById('ref-tray');
-            if (!container) return; //以此防止报错
+            if (!container) return; // 防止找不到元素报错
+
+            // 更新计数器
+            const countLabel = document.getElementById('ref-count');
+            if(countLabel) countLabel.innerText = `${refImages.length}/10`;
 
             if (!refImages.length) {
                 container.innerHTML = '';
                 container.classList.add('hidden');
                 return;
             }
-
-            container.classList.remove('hidden');
-            // 更新计数器 (可选，优化体验)
-            const countLabel = document.getElementById('ref-count');
-            if(countLabel) countLabel.innerText = `${refImages.length}/10`;
-
-            container.innerHTML = refImages.map(img => `
-                <div class="relative group w-16 h-16 flex-shrink-0">
-                    <img src="${img.base64}" class="w-full h-full object-cover rounded border border-gray-200 ${selectedRefIds.has(img.id) ? 'ring-2 ring-blue-500' : ''}" onclick="toggleRef(${img.id})">
-                    <button onclick="removeRef(${img.id})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
-                </div>
-            `).join('');
-        }
 
             container.classList.remove('hidden');
             container.innerHTML = refImages.map(img => `
@@ -913,7 +899,7 @@
         }
 
         // =======================================================
-        // 5. 辅助工具 & 画廊 & 认证 (✅ 全部保留原版)
+        // 5. 辅助工具 & 画廊 & 认证
         // =======================================================
         
         async function forceDownload(url) {
@@ -1220,6 +1206,7 @@
     </script>
 </body>
 </html>
+
 
 
 
