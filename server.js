@@ -49,7 +49,7 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (无需安装插件)
+// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (增强版)
 // ==================================================================
 function generateMultipartBody(fields) {
     const boundary = '----BananaBoundary' + Math.random().toString(36).substring(2);
@@ -59,19 +59,44 @@ function generateMultipartBody(fields) {
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
 
-        // [升级] 支持数组：如果是数组，循环添加多个同名字段
-        if (Array.isArray(value)) {
-            value.forEach(item => {
-                chunks.push(Buffer.from(`--${boundary}${crlf}`));
-                chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${crlf}${crlf}`));
-                chunks.push(Buffer.from(`${item}${crlf}`));
-            });
-        } else {
-            // 原有逻辑：处理单个值
+        const values = Array.isArray(value) ? value : [value];
+
+        values.forEach((item, index) => {
+            let partData = item;
+            // 默认头部
+            let partHeaders = [`Content-Disposition: form-data; name="${key}"`];
+
+            // [修复] 针对图片进行特殊处理：
+            // 1. 识别 DataURL 格式 (data:image/...)
+            // 2. 转换为二进制 Buffer (减少体积)
+            // 3. 添加 filename 属性 (欺骗服务端这是文件，防止 bufio buffer full 报错)
+            if (key === 'image' && typeof item === 'string' && item.startsWith('data:')) {
+                const matches = item.match(/^data:(.+);base64,(.+)$/);
+                if (matches) {
+                    const mimeType = matches[1];     // 例如 image/png
+                    const base64Data = matches[2];   // 图片数据
+                    const ext = mimeType.split('/')[1] || 'png';
+                    
+                    // 关键点：加上 filename，服务端就会把它当文件处理
+                    partHeaders[0] += `; filename="image_${index}.${ext}"`;
+                    partHeaders.push(`Content-Type: ${mimeType}`);
+                    
+                    // 转为二进制
+                    partData = Buffer.from(base64Data, 'base64');
+                }
+            }
+
             chunks.push(Buffer.from(`--${boundary}${crlf}`));
-            chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${crlf}${crlf}`));
-            chunks.push(Buffer.from(`${value}${crlf}`));
-        }
+            chunks.push(Buffer.from(partHeaders.join(crlf) + crlf + crlf));
+            
+            // 写入数据（支持 Buffer 或 字符串）
+            if (Buffer.isBuffer(partData)) {
+                chunks.push(partData);
+            } else {
+                chunks.push(Buffer.from(String(partData)));
+            }
+            chunks.push(Buffer.from(crlf));
+        });
     }
     chunks.push(Buffer.from(`--${boundary}--${crlf}`));
 
@@ -254,4 +279,5 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
 
