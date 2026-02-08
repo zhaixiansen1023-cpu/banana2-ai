@@ -1,3 +1,4 @@
+const FormData = require('form-data');
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
@@ -158,43 +159,56 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 5. 异步引擎 (兼容性修复：Boundary 加引号 + KeepAlive)
+// 🔵 5. 异步引擎 (使用官方推荐的 standard library 修复 EOF 问题)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
-    const fields = {
-        model: body.model,
-        prompt: body.prompt,
-        size: body.size || "16:9"
-    };
+    // 创建标准的 FormData 对象
+    const form = new FormData();
+    
+    // 添加基础参数
+    form.append('model', body.model);
+    form.append('prompt', body.prompt);
+    form.append('size', body.size || "16:9");
 
+    // 处理图片 (直接支持 Base64 转换)
     if (body.images && body.images.length > 0) {
-        fields.image = body.images; 
+        body.images.forEach((imgStr, index) => {
+            if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
+                // 解析 Base64
+                const matches = imgStr.match(/^data:(.+);base64,(.+)$/);
+                if (matches) {
+                    const mimeType = matches[1];
+                    const buffer = Buffer.from(matches[2], 'base64');
+                    // 必须指定 filename，否则服务端可能无法识别为文件
+                    const ext = mimeType.split('/')[1] || 'png';
+                    form.append('image', buffer, { // 注意：大多数 API 期望的字段名是 'image' 或 'file'
+                        filename: `image_${index}.${ext}`,
+                        contentType: mimeType
+                    });
+                }
+            }
+        });
     }
 
-    const { boundary, body: multipartData } = generateMultipartBody(fields);
-
     // 提交任务
+    // 注意：form.getHeaders() 会自动生成正确的 Boundary 和 Content-Type
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
-            // [修改] 这里的 boundary 值加上双引号，这是某些严格服务器的要求
-            'Content-Type': `multipart/form-data; boundary="${boundary}"`,
-            'Content-Length': multipartData.length.toString(),
-            'Authorization': `Bearer ${process.env.API_KEY}` 
+            'Authorization': `Bearer ${process.env.API_KEY}`,
+            ...form.getHeaders() // <--- 关键：让库自动生成 Headers
         },
-        body: multipartData,
-        agent: ignoreSSL // 确保这里使用了开启 keepAlive 的 agent
+        body: form,
+        agent: ignoreSSL
     });
 
     if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
-    
-    // ... 后面的轮询逻辑保持不变 ...
     const taskData = await submitRes.json();
     const taskId = taskData.id;
 
-    // 轮询等待
+    // 轮询等待 (保持原有逻辑)
     let attempts = 0;
     while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
@@ -208,9 +222,9 @@ async function handleAsyncGeneration(body, apiPath) {
         const statusData = await checkRes.json();
         
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
-            return statusData.video_url || statusData.url;
+            return statusData.video_url || statusData.url; // 兼容视频和图片返回字段
         } else if (statusData.status === 'failed') {
-            throw new Error("生成失败 (API Status: failed)");
+            throw new Error(`生成失败: ${statusData.error || '未知错误'}`);
         }
     }
     throw new Error("生成超时");
@@ -283,6 +297,7 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
 
 
 
