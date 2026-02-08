@@ -10,45 +10,34 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ==================================================================
-// 🔍 1. 启动检查与数据库连接 (防崩溃处理)
+// 🔍 1. 启动检查与数据库连接
 // ==================================================================
-let supabase = null; // 先设为空，防止初始化失败导致程序崩溃
-
+let supabase = null;
 const requiredEnv = ['API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 
-// 如果缺变量，只报错，不崩溃
 if (missingEnv.length > 0) {
-    console.error(`\n❌❌❌ [启动警告] 缺少环境变量: ${missingEnv.join(', ')} ❌❌❌`);
-    console.error(`请在 Zeabur 环境变量设置中添加它们。在添加之前，生成功能将无法使用。\n`);
+    console.error(`\n❌❌❌ [启动警告] 缺少环境变量: ${missingEnv.join(', ')}`);
 } else {
-    // 只有变量全的时候才尝试连接
     try {
-        supabase = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_KEY
-        );
+        supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         console.log('✅ Supabase 数据库连接成功');
     } catch (err) {
         console.error('❌ Supabase 初始化失败:', err.message);
     }
 }
 
-// 忽略 SSL 证书错误 (针对某些 API 证书问题)
 const ignoreSSL = new https.Agent({ rejectUnauthorized: false });
-
-// 允许所有跨域 (方便调试)
 const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-// 健康检查接口
-app.get('/', (req, res) => res.send('Z-AI Proxy Server is Running...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Multipart Fix)...'));
 
 // ==================================================================
-// 🟢 2. 模型注册表
+// 🟢 2. 模型配置
 // ==================================================================
 const MODEL_REGISTRY = {
     'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
@@ -60,27 +49,44 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🟢 3. 统一调度接口
+// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (无需安装插件)
+// ==================================================================
+function generateMultipartBody(fields) {
+    const boundary = '----BananaBoundary' + Math.random().toString(36).substring(2);
+    const crlf = '\r\n';
+    const chunks = [];
+
+    for (const [key, value] of Object.entries(fields)) {
+        if (value !== undefined && value !== null) {
+            chunks.push(Buffer.from(`--${boundary}${crlf}`));
+            chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${crlf}${crlf}`));
+            chunks.push(Buffer.from(`${value}${crlf}`));
+        }
+    }
+    chunks.push(Buffer.from(`--${boundary}--${crlf}`));
+
+    return {
+        boundary,
+        body: Buffer.concat(chunks)
+    };
+}
+
+// ==================================================================
+// 🟢 4. 统一调度接口
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
-    // 🚨 第一道防线：如果服务器没连上数据库，直接拦截
-    if (!supabase) {
-        return res.status(500).json({ 
-            error: { message: "服务器环境变量未配置，无法连接数据库。" } 
-        });
-    }
+    if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
 
     let userForRefund = null;
     let costForRefund = 0;
 
     try {
-        // 1. 身份验证
         const authHeader = req.headers.authorization;
         if (!authHeader) return res.status(401).json({ error: { message: "No Token" } });
+        
         const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1]);
         if (authError || !user) return res.status(403).json({ error: { message: "Invalid Token" } });
 
-        // 2. 查表
         const modelName = req.body.model;
         const config = MODEL_REGISTRY[modelName] || MODEL_REGISTRY['default'];
         
@@ -90,28 +96,21 @@ app.post('/api/proxy', async (req, res) => {
 
         console.log(`🤖 Model: ${modelName} | Mode: ${config.type.toUpperCase()} | User: ${user.email}`);
 
-        // 3. 扣费
         const { error: creditError } = await supabase.rpc('decrement_credits', { count: cost, x_user_id: user.id });
         if (creditError) return res.status(402).json({ error: { message: "积分不足" } });
 
-        // 4. 分流处理
         let resultUrl = "";
-        
         if (config.type === 'async') {
             resultUrl = await handleAsyncGeneration(req.body, config.path);
         } else {
             resultUrl = await handleSyncGeneration(req.body, config.path, user.id);
         }
 
-        res.status(200).json({
-            created: Date.now(),
-            data: [{ url: resultUrl }]
-        });
+        res.status(200).json({ created: Date.now(), data: [{ url: resultUrl }] });
 
     } catch (error) {
-        console.error("❌ Error:", error.message);
-        // 自动退款
-        if (userForRefund && supabase) {
+        console.error("❌ 处理错误:", error.message);
+        if (userForRefund) {
             await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
         }
         res.status(500).json({ error: { message: error.message || "Server Error" } });
@@ -119,20 +118,29 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 4. 异步引擎
+// 🔵 5. 异步引擎 (使用 Multipart 表单发送)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
+    // 构造表单数据
+    const fields = {
+        model: body.model,
+        prompt: body.prompt,
+        size: body.size || "16:9"
+    };
+
+    // 原生构建 Multipart 表单
+    const { boundary, body: multipartData } = generateMultipartBody(fields);
+
     // 提交任务
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.API_KEY}` },
-        body: JSON.stringify({
-            model: body.model,
-            prompt: body.prompt,
-            size: body.size || "16:9" 
-        }),
+        headers: { 
+            'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            'Authorization': `Bearer ${process.env.API_KEY}` 
+        },
+        body: multipartData,
         agent: ignoreSSL
     });
 
@@ -145,7 +153,6 @@ async function handleAsyncGeneration(body, apiPath) {
     while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
         attempts++;
-        
         const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
             headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
             agent: ignoreSSL
@@ -157,14 +164,14 @@ async function handleAsyncGeneration(body, apiPath) {
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
             return statusData.video_url || statusData.url;
         } else if (statusData.status === 'failed') {
-            throw new Error("生成失败");
+            throw new Error("生成失败 (API Status: failed)");
         }
     }
     throw new Error("生成超时");
 }
 
 // ==================================================================
-// 🟠 5. 同步引擎
+// 🟠 6. 同步引擎 (保持 JSON 发送)
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
     const baseUrl = "https://api.tu-zi.com"; 
@@ -193,7 +200,6 @@ async function handleSyncGeneration(body, apiPath, userId) {
     if (data.data && data.data.length > 0) {
         const item = data.data[0];
         if (item.url) return item.url;
-        // 如果是 Base64，且数据库连接正常，才转存
         if (item.b64_json && supabase) {
             console.log("⚠️ 转存 Base64...");
             const buffer = Buffer.from(item.b64_json, 'base64');
@@ -207,59 +213,28 @@ async function handleSyncGeneration(body, apiPath, userId) {
     throw new Error("无法识别返回格式");
 }
 
-// 前端路由
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(port, () => console.log(`✅ 服务器已启动 (Port ${port})`));
 
-// ==================================================================
-// 🧹 6. 自动清理任务 (完整逻辑)
-// ==================================================================
+// 自动清理任务
 cron.schedule('0 0 * * *', async () => {
     if (!supabase) return;
-    console.log('🕒 [自动任务] 开始深度清理 temp 文件夹...');
-
     const BUCKET_NAME = 'ai-images'; 
     const ROOT_FOLDER = 'temp';
-
     try {
-        const { data: userFolders, error: listError } = await supabase
-            .storage
-            .from(BUCKET_NAME)
-            .list(ROOT_FOLDER);
-
-        if (listError) throw listError;
-
-        if (!userFolders || userFolders.length === 0) {
-            console.log('✅ temp 文件夹已经是空的。');
-            return;
-        }
-
-        let totalFilesDeleted = 0;
-
-        for (const folder of userFolders) {
+        const { data: folders } = await supabase.storage.from(BUCKET_NAME).list(ROOT_FOLDER);
+        if (!folders) return;
+        for (const folder of folders) {
             if (folder.name === '.emptyFolderPlaceholder') continue;
-            const userFolderPath = `${ROOT_FOLDER}/${folder.name}`;
-            
-            const { data: files } = await supabase
-                .storage
-                .from(BUCKET_NAME)
-                .list(userFolderPath);
-
-            if (files && files.length > 0) {
-                const pathsToDelete = files.map(f => `${userFolderPath}/${f.name}`);
-                const { error: removeError } = await supabase
-                    .storage
-                    .from(BUCKET_NAME)
-                    .remove(pathsToDelete);
-                
-                if (!removeError) {
-                    totalFilesDeleted += pathsToDelete.length;
-                }
+            const path = `${ROOT_FOLDER}/${folder.name}`;
+            const { data: files } = await supabase.storage.from(BUCKET_NAME).list(path);
+            if (files?.length) {
+                await supabase.storage.from(BUCKET_NAME).remove(files.map(f => `${path}/${f.name}`));
             }
         }
-        console.log(`✅ 清理完成！共删除了 ${totalFilesDeleted} 张临时图片。`);
+        console.log('✅ 每日清理完成');
     } catch (err) {
-        console.error('❌ 清理失败:', err.message);
+        console.error('清理错误:', err.message);
     }
 });
