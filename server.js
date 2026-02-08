@@ -49,7 +49,7 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (增强版)
+// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (内存优化版)
 // ==================================================================
 function generateMultipartBody(fields) {
     const boundary = '----BananaBoundary' + Math.random().toString(36).substring(2);
@@ -66,30 +66,32 @@ function generateMultipartBody(fields) {
             // 默认头部
             let partHeaders = [`Content-Disposition: form-data; name="${key}"`];
 
-            // [修复] 针对图片进行特殊处理：
-            // 1. 识别 DataURL 格式 (data:image/...)
-            // 2. 转换为二进制 Buffer (减少体积)
-            // 3. 添加 filename 属性 (欺骗服务端这是文件，防止 bufio buffer full 报错)
+            // [优化] 移除正则匹配，改用 substring 以防止大文件导致内存溢出/崩溃
             if (key === 'image' && typeof item === 'string' && item.startsWith('data:')) {
-                const matches = item.match(/^data:(.+);base64,(.+)$/);
-                if (matches) {
-                    const mimeType = matches[1];     // 例如 image/png
-                    const base64Data = matches[2];   // 图片数据
+                const commaIndex = item.indexOf(',');
+                const semicolonIndex = item.indexOf(';');
+                const colonIndex = item.indexOf(':');
+
+                // 简单的格式校验 data:image/png;base64,.....
+                if (commaIndex > 0 && semicolonIndex > colonIndex) {
+                    // 提取 mimeType (例如 image/png)
+                    const mimeType = item.substring(colonIndex + 1, semicolonIndex);
                     const ext = mimeType.split('/')[1] || 'png';
                     
-                    // 关键点：加上 filename，服务端就会把它当文件处理
+                    // 构造文件名头部，欺骗服务端这是文件上传
                     partHeaders[0] += `; filename="image_${index}.${ext}"`;
                     partHeaders.push(`Content-Type: ${mimeType}`);
                     
-                    // 转为二进制
-                    partData = Buffer.from(base64Data, 'base64');
+                    // 提取 Base64 内容并转为 Buffer (二进制)，比字符串更省内存
+                    const base64Str = item.substring(commaIndex + 1);
+                    partData = Buffer.from(base64Str, 'base64');
                 }
             }
 
             chunks.push(Buffer.from(`--${boundary}${crlf}`));
             chunks.push(Buffer.from(partHeaders.join(crlf) + crlf + crlf));
             
-            // 写入数据（支持 Buffer 或 字符串）
+            // 写入数据
             if (Buffer.isBuffer(partData)) {
                 chunks.push(partData);
             } else {
@@ -279,5 +281,6 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
 
 
