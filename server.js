@@ -1,4 +1,4 @@
-const FormData = require('form-data'); // ✅ 必须确保 package.json 里有 "form-data": "^4.0.0"
+const FormData = require('form-data'); // 必须确保 package.json 已包含 "form-data": "^4.0.0"
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const https = require('https');
 
 const app = express();
-const port = process.env.PORT || 8080; // Zeabur 通常使用 8080，这里保留你的逻辑
+const port = process.env.PORT || 8080;
 
 // ==================================================================
 // 🔍 1. 启动检查与数据库连接
@@ -28,7 +28,7 @@ if (missingEnv.length > 0) {
     }
 }
 
-// [修改] 开启 keepAlive，防止大文件上传时连接中断
+// 开启 keepAlive
 const ignoreSSL = new https.Agent({ 
     rejectUnauthorized: false,
     keepAlive: true 
@@ -39,10 +39,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Multipart Fixed)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Buffer Mode Fix)...'));
 
 // ==================================================================
-// 🟢 2. 模型配置 (完全保留你的配置)
+// 🟢 2. 模型配置
 // ==================================================================
 const MODEL_REGISTRY = {
     'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
@@ -54,64 +54,56 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🔵 3. 异步引擎 (🔥核心修复：使用库 + 显式长度)
+// 🔵 3. 异步引擎 (🔥杀手锏：强制 Buffer 模式，彻底杜绝 EOF)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
-    // 1. 创建标准的 FormData 对象 (不再手动拼接字符串)
+    // 1. 创建表单
     const form = new FormData();
-    
-    // 2. 添加基础参数
     form.append('model', body.model);
     form.append('prompt', body.prompt);
-    // 注意：有些模型可能需要严格的宽高比字符串
-    form.append('size', body.size || "16:9"); 
+    form.append('size', body.size || "16:9");
 
-    // 3. 处理图片 (支持多图 + Base64自动转二进制)
+    // 2. 处理图片
     if (body.images && body.images.length > 0) {
         body.images.forEach((imgStr, index) => {
             if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
-                // 解析 Base64
                 const matches = imgStr.match(/^data:(.+);base64,(.+)$/);
                 if (matches) {
                     const mimeType = matches[1];
                     const buffer = Buffer.from(matches[2], 'base64');
                     const ext = mimeType.split('/')[1] || 'png';
                     
-                    // 添加到表单
                     form.append('image', buffer, { 
                         filename: `image_${index}.${ext}`,
-                        contentType: mimeType,
-                        knownLength: buffer.length // 显式告知库文件大小
+                        contentType: mimeType
                     });
                 }
             }
         });
     }
 
-    // 4. [🔥关键步骤] 获取整个表单的准确字节长度
-    // 这一步是解决 "NextPart: EOF" 错误的核心
-    const getLength = (formData) => {
-        return new Promise((resolve, reject) => {
-            formData.getLength((err, length) => {
-                if (err) reject(err);
-                else resolve(length);
-            });
-        });
-    };
+    // 3. [🔥核心代码] 将整个 Form 流转换为单一 Buffer
+    // 这能强制 node-fetch 发送完整的数据包，而不是分块发送
+    // 从而解决 "NextPart: EOF" 错误
+    const formBuffer = await new Promise((resolve, reject) => {
+        const chunks = [];
+        form.on('data', (chunk) => chunks.push(chunk));
+        form.on('end', () => resolve(Buffer.concat(chunks)));
+        form.on('error', (err) => reject(err));
+        form.resume(); // 开始读取流
+    });
 
-    const contentLength = await getLength(form);
-
-    // 5. 提交请求
+    // 4. 提交任务
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
             'Authorization': `Bearer ${process.env.API_KEY}`,
-            ...form.getHeaders(),       // 让库自动生成正确的 Boundary
-            'Content-Length': contentLength // 🔥 必须加上这行，禁止分块传输
+            ...form.getHeaders(), // 获取正确的 boundary
+            'Content-Length': formBuffer.length // 显式指定长度，这就是 Buffer 的优势
         },
-        body: form,
+        body: formBuffer, // 发送 Buffer，不要发送 form 对象
         agent: ignoreSSL
     });
 
@@ -119,7 +111,7 @@ async function handleAsyncGeneration(body, apiPath) {
     const taskData = await submitRes.json();
     const taskId = taskData.id;
 
-    // 6. 轮询等待
+    // 5. 轮询等待
     let attempts = 0;
     while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
@@ -133,7 +125,6 @@ async function handleAsyncGeneration(body, apiPath) {
         const statusData = await checkRes.json();
         
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
-            // 兼容不同的返回字段
             return statusData.video_url || statusData.url || (statusData.images && statusData.images[0]?.url);
         } else if (statusData.status === 'failed') {
             throw new Error(`生成失败: ${JSON.stringify(statusData)}`);
@@ -143,7 +134,7 @@ async function handleAsyncGeneration(body, apiPath) {
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口 (完全保留你的逻辑)
+// 🟢 4. 统一调度接口 (逻辑保持不变)
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -171,7 +162,6 @@ app.post('/api/proxy', async (req, res) => {
         if (creditError) return res.status(402).json({ error: { message: "积分不足" } });
 
         let resultUrl = "";
-        // 这里会把 config.path (即 /v1/videos) 传给 handleAsyncGeneration
         if (config.type === 'async') {
             resultUrl = await handleAsyncGeneration(req.body, config.path);
         } else {
