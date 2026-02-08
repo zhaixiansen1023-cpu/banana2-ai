@@ -4,211 +4,201 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-const https = require('https'); // 🟢 新增：引入 https 模块
+const https = require('https');
+
+// ==================================================================
+// 🟢 1. 模型注册表 (根据文档调整)
+// ==================================================================
+const MODEL_REGISTRY = {
+    // --- 异步模型 (文档 2.1 类似, 对应 /v1/videos 路径) ---
+    'gemini-3-pro-image-preview-async':    { type: 'async', path: '/v1/videos', cost: 5 },
+    'gemini-3-pro-image-preview-2k-async': { type: 'async', path: '/v1/videos', cost: 10 },
+    'gemini-3-pro-image-preview-4k-async': { type: 'async', path: '/v1/videos', cost: 15 },
+
+    // --- 同步模型 (文档 2.2 对应 /v1/images/generations) ---
+    // 你可以在这里添加更多支持 OpenAI 格式的模型
+    'gemini-3-pro-image-preview':          { type: 'sync',  path: '/v1/images/generations', cost: 5 },
+    'dall-e-3':                            { type: 'sync',  path: '/v1/images/generations', cost: 20 },
+    
+    // --- 默认配置 ---
+    'default':                             { type: 'async', path: '/v1/videos', cost: 5 }
+};
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// --- 环境变量检查 ---
+// 环境变量检查
 const requiredEnv = ['API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
-const missingEnv = requiredEnv.filter(key => !process.env[key]);
-if (missingEnv.length > 0) {
-    console.error(`❌ 严重错误: 缺少环境变量: ${missingEnv.join(', ')}`);
-}
+if (requiredEnv.some(key => !process.env[key])) console.error("❌ 缺少环境变量");
 
-// 初始化 Supabase 管理员客户端 (用于后端扣费)
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY // ⚠️ 必须是 Service Role Key
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const ignoreSSL = new https.Agent({ rejectUnauthorized: false });
 
-// --- 安全域名白名单 ---
-const ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'zhaixiansen.zeabur.app', // 你的 Zeabur 域名
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || ALLOWED_HOSTS.some(host => origin.includes(host))) {
-            callback(null, true);
-        } else {
-            console.log("拦截跨域:", origin);
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
-
-// 🟢 新增：创建一个“忽略 SSL 证书错误”的代理 (专治 api.tu-zi.com 证书报错)
-const ignoreSSL = new https.Agent({
-    rejectUnauthorized: false
-});
+const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Server: Secure & Billing Active (Patched)'));
+app.get('/', (req, res) => res.send('Z-AI Universal Proxy Running (V7.2 Patched)...'));
 
-// --- 核心：带扣费逻辑的代理接口 ---
+// ==================================================================
+// 🟢 2. 统一调度接口
+// ==================================================================
 app.post('/api/proxy', async (req, res) => {
-    // 定义变量用于后续可能的退款
     let userForRefund = null;
     let costForRefund = 0;
 
     try {
-        // 1. 身份验证：从请求头里拿 Token
+        // --- 鉴权 ---
         const authHeader = req.headers.authorization;
-        if (!authHeader) {
-            return res.status(401).json({ error: { message: "未登录：缺少 Authorization 头" } });
-        }
-        const token = authHeader.split(' ')[1]; // 去掉 "Bearer " 前缀
+        if (!authHeader) return res.status(401).json({ error: { message: "No Token" } });
+        const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1]);
+        if (authError || !user) return res.status(403).json({ error: { message: "Invalid Token" } });
 
-        // 2. 向 Supabase 核实用户身份
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        // --- 查表 ---
+        const modelName = req.body.model;
+        const config = MODEL_REGISTRY[modelName] || MODEL_REGISTRY['default'];
         
-        if (authError || !user) {
-            return res.status(403).json({ error: { message: "身份验证失败，Token 无效" } });
-        }
-
-        // 3. 计算扣费金额 (根据画质参数)
-        const reqBody = req.body;
-        let cost = 5; // 默认 1k 价格
-        if (reqBody.model && reqBody.model.includes('4k')) cost = 15;
-        else if (reqBody.model && reqBody.model.includes('2k')) cost = 10;
-
-        console.log(`用户 ${user.email} 请求生成，预计扣费: ${cost}`);
-
-        // 4. 执行扣费 (调用数据库 RPC 函数)
-        const { error: creditError } = await supabase.rpc('decrement_credits', {
-            count: cost,
-            x_user_id: user.id
-        });
-
-        if (creditError) {
-            console.error("扣费失败:", creditError);
-            if (creditError.message && creditError.message.includes('积分不足')) {
-                return res.status(402).json({ error: { message: "余额不足，请充值" } });
-            }
-            return res.status(500).json({ error: { message: "积分系统异常" } });
-        }
-
-        // 记录下来，如果后面 API 调用崩了，好把钱退给人家
-        userForRefund = user;
+        const cost = config.cost;
         costForRefund = cost;
+        userForRefund = user;
 
-        // --- 5. 扣费成功，才允许调用 AI ---
-        const apiKey = process.env.API_KEY;
-        const response = await fetch("https://api.tu-zi.com/v1/images/generations", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(reqBody),
-            agent: ignoreSSL // 🟢 新增：强制忽略 SSL 证书报错
-        });
+        console.log(`🤖 Model: ${modelName} | Mode: ${config.type.toUpperCase()} | Cost: ${cost}`);
 
-        // 🟢 新增：防崩坏逻辑
-        // 先检查对方状态码，如果不是 200 OK，千万别解析 JSON，否则会报错 "Unexpected token B"
-        if (!response.ok) {
-            const errorText = await response.text(); // 以文本形式读取错误
-            console.error(`❌ 供应商报错 (${response.status}):`, errorText);
+        // --- 扣费 ---
+        const { error: creditError } = await supabase.rpc('decrement_credits', { count: cost, x_user_id: user.id });
+        if (creditError) return res.status(402).json({ error: { message: "积分不足" } });
 
-            // 💰 自动退款逻辑：供应商挂了，必须把积分退给用户
-            if (userForRefund) {
-                console.warn(`正在为用户 ${userForRefund.email} 执行退款: ${costForRefund} 积分...`);
-                await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
-            }
-            
-            // 把错误原样扔回给前端，自己别崩
-            return res.status(response.status).json({
-                error: { message: `供应商服务异常 (${response.status})，积分已自动退回。` },
-                details: errorText.substring(0, 200) 
-            });
+        // --- 分流 ---
+        let resultUrl = "";
+        
+        if (config.type === 'async') {
+            resultUrl = await handleAsyncGeneration(req.body, config.path);
+        } else {
+            // 传入 user.id 以便处理 Base64 转存
+            resultUrl = await handleSyncGeneration(req.body, config.path, user.id);
         }
 
-        const data = await response.json();
-        res.status(200).json(data);
+        res.status(200).json({ created: Date.now(), data: [{ url: resultUrl }] });
 
     } catch (error) {
-        console.error("Proxy Error:", error);
+        console.error("❌ Error:", error.message);
+        if (userForRefund) await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+        res.status(500).json({ error: { message: error.message || "Server Error" } });
+    }
+});
+
+// ==================================================================
+// 🔵 3. 异步引擎 (Async / Polling)
+// ==================================================================
+async function handleAsyncGeneration(body, apiPath) {
+    const baseUrl = "https://api.tu-zi.com";
+    
+    // 提交
+    const submitRes = await fetch(`${baseUrl}${apiPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.API_KEY}` },
+        body: JSON.stringify({
+            model: body.model,
+            prompt: body.prompt,
+            size: body.size || "16:9" 
+        }),
+        agent: ignoreSSL
+    });
+
+    if (!submitRes.ok) throw new Error(`提交失败: ${await submitRes.text()}`);
+    const taskData = await submitRes.json();
+    const taskId = taskData.id;
+
+    // 轮询
+    let attempts = 0;
+    while (attempts < 60) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempts++;
         
-        // 💰 发生代码级异常（如网络中断），也要退款
-        if (userForRefund) {
-            console.warn(`系统异常，执行退款: ${costForRefund} 积分...`);
-            await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+        const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
+            headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
+            agent: ignoreSSL
+        });
+        
+        if (!checkRes.ok) continue;
+        const statusData = await checkRes.json();
+        
+        if (statusData.status === 'completed' || statusData.status === 'succeeded') {
+            return statusData.video_url || statusData.url;
+        } else if (statusData.status === 'failed') {
+            throw new Error("API 报告生成失败");
         }
-
-        res.status(500).json({ error: { message: "服务器内部错误，积分已退回" } });
     }
-});
+    throw new Error("生成超时");
+}
 
-// 处理前端路由
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// ==================================================================
+// 🟠 4. 同步引擎 (Sync / Direct) - 修复了 Base64 处理
+// ==================================================================
+async function handleSyncGeneration(body, apiPath, userId) {
+    const baseUrl = "https://api.tu-zi.com"; 
 
-app.listen(port, () => {
-    console.log(`Server running on port ${port} - V7.1 SSL修复版`); // 👈 改这里
-});
+    // 尺寸转换
+    let sizeParam = "1024x1024";
+    if (body.size === "16:9") sizeParam = "1792x1024";
+    else if (body.size === "3:4") sizeParam = "1024x1792";
 
-// 设置定时任务：每天凌晨 00:00 执行
-cron.schedule('0 0 * * *', async () => {
-    console.log('🕒 [自动任务] 开始深度清理 temp 文件夹...');
+    const payload = {
+        model: body.model,
+        prompt: body.prompt,
+        size: sizeParam,
+        n: 1,
+        response_format: "url" // 🟢 显式请求 URL，减少 Base64 概率
+    };
 
-    const BUCKET_NAME = 'ai-images'; 
-    const ROOT_FOLDER = 'temp';
+    const res = await fetch(`${baseUrl}${apiPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.API_KEY}` },
+        body: JSON.stringify(payload),
+        agent: ignoreSSL
+    });
 
-    try {
-        // 1. 先列出 temp 下面有哪些“用户文件夹”
-        const { data: userFolders, error: listError } = await supabase
-            .storage
-            .from(BUCKET_NAME)
-            .list(ROOT_FOLDER);
+    if (!res.ok) throw new Error(`生成失败: ${await res.text()}`);
+    const data = await res.json();
+    
+    // 🟢 增强处理：优先找 URL，如果没有，找 b64_json 并自动转存
+    if (data.data && data.data.length > 0) {
+        const item = data.data[0];
 
-        if (listError) throw listError;
+        // 情况 A: 完美，直接给了 URL
+        if (item.url) return item.url;
 
-        if (!userFolders || userFolders.length === 0) {
-            console.log('✅ temp 文件夹已经是空的。');
-            return;
-        }
-
-        let totalFilesDeleted = 0;
-
-        // 2. 遍历每一个“用户文件夹”，把里面的图片找出来
-        for (const folder of userFolders) {
-            // 跳过占位符文件
-            if (folder.name === '.emptyFolderPlaceholder') continue;
-
-            const userFolderPath = `${ROOT_FOLDER}/${folder.name}`;
+        // 情况 B: 给了 Base64 (文档里提到的情况)
+        if (item.b64_json) {
+            console.log("⚠️ API 返回了 Base64，正在转存到 Supabase...");
+            const buffer = Buffer.from(item.b64_json, 'base64');
+            const fileName = `temp/${userId}/sync_${Date.now()}.png`;
             
-            // 钻进文件夹找图片
-            const { data: files } = await supabase
-                .storage
-                .from(BUCKET_NAME)
-                .list(userFolderPath);
-
-            if (files && files.length > 0) {
-                const pathsToDelete = files.map(f => `${userFolderPath}/${f.name}`);
+            const { error } = await supabase.storage
+                .from('ai-images')
+                .upload(fileName, buffer, { contentType: 'image/png' });
                 
-                // 执行删除
-                const { error: removeError } = await supabase
-                    .storage
-                    .from(BUCKET_NAME)
-                    .remove(pathsToDelete);
+            if (error) throw new Error("Base64 转存失败: " + error.message);
+            
+            const { data: publicData } = supabase.storage
+                .from('ai-images')
+                .getPublicUrl(fileName);
                 
-                if (!removeError) {
-                    totalFilesDeleted += pathsToDelete.length;
-                }
-            }
+            return publicData.publicUrl;
         }
-
-        console.log(`✅ 清理完成！共删除了 ${totalFilesDeleted} 张临时图片，所有空文件夹已自动消失。`);
-
-    } catch (err) {
-        console.error('❌ 清理失败:', err.message);
     }
-});
 
+    throw new Error("API 返回的数据格式无法识别 (无 url 也无 b64_json)");
+}
+
+// 前端路由
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+app.listen(port, () => console.log(`Universal Proxy running on port ${port}`));
+
+// 自动清理任务
+cron.schedule('0 0 * * *', async () => {
+    // 你的清理逻辑
+});
