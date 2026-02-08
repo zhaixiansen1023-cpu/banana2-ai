@@ -49,10 +49,11 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (内存优化版)
+// 🛠️ 3. 工具函数：原生构建 Multipart 表单 (内存优化 + 兼容性增强版)
 // ==================================================================
 function generateMultipartBody(fields) {
-    const boundary = '----BananaBoundary' + Math.random().toString(36).substring(2);
+    // [优化] 使用更简单的 Boundary 字符串，避免某些服务器解析出错
+    const boundary = 'BananaBoundary' + Date.now().toString(16);
     const crlf = '\r\n';
     const chunks = [];
 
@@ -63,26 +64,25 @@ function generateMultipartBody(fields) {
 
         values.forEach((item, index) => {
             let partData = item;
-            // 默认头部
             let partHeaders = [`Content-Disposition: form-data; name="${key}"`];
 
-            // [优化] 移除正则匹配，改用 substring 以防止大文件导致内存溢出/崩溃
+            // 处理 Base64 图片
             if (key === 'image' && typeof item === 'string' && item.startsWith('data:')) {
                 const commaIndex = item.indexOf(',');
                 const semicolonIndex = item.indexOf(';');
                 const colonIndex = item.indexOf(':');
 
-                // 简单的格式校验 data:image/png;base64,.....
                 if (commaIndex > 0 && semicolonIndex > colonIndex) {
-                    // 提取 mimeType (例如 image/png)
                     const mimeType = item.substring(colonIndex + 1, semicolonIndex);
                     const ext = mimeType.split('/')[1] || 'png';
                     
-                    // 构造文件名头部，欺骗服务端这是文件上传
+                    // 构造文件头
                     partHeaders[0] += `; filename="image_${index}.${ext}"`;
                     partHeaders.push(`Content-Type: ${mimeType}`);
+                    // [新增] 显式声明传输编码，防止乱码或解析错误
+                    partHeaders.push(`Content-Transfer-Encoding: binary`);
                     
-                    // 提取 Base64 内容并转为 Buffer (二进制)，比字符串更省内存
+                    // 提取二进制数据
                     const base64Str = item.substring(commaIndex + 1);
                     partData = Buffer.from(base64Str, 'base64');
                 }
@@ -91,10 +91,10 @@ function generateMultipartBody(fields) {
             chunks.push(Buffer.from(`--${boundary}${crlf}`));
             chunks.push(Buffer.from(partHeaders.join(crlf) + crlf + crlf));
             
-            // 写入数据
             if (Buffer.isBuffer(partData)) {
                 chunks.push(partData);
             } else {
+                // 确保文本字段也是 Buffer
                 chunks.push(Buffer.from(String(partData)));
             }
             chunks.push(Buffer.from(crlf));
@@ -155,25 +155,21 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🔵 5. 异步引擎 (使用 Multipart 表单发送)
+// 🔵 5. 异步引擎 (修复 EOF 问题的关键：显式 Content-Length)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
-    // 构造表单数据
     const fields = {
         model: body.model,
         prompt: body.prompt,
         size: body.size || "16:9"
     };
 
-    // [升级] 支持多图：直接将图片数组传给 image 字段
-    // generateMultipartBody 函数会自动将其展开为多个 image 部分
     if (body.images && body.images.length > 0) {
         fields.image = body.images; 
     }
 
-    // 原生构建 Multipart 表单
     const { boundary, body: multipartData } = generateMultipartBody(fields);
 
     // 提交任务
@@ -181,6 +177,8 @@ async function handleAsyncGeneration(body, apiPath) {
         method: 'POST',
         headers: { 
             'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            // [🚩核心修复] 显式指定内容长度，禁用 Chunked 传输，解决 EOF 报错
+            'Content-Length': multipartData.length.toString(),
             'Authorization': `Bearer ${process.env.API_KEY}` 
         },
         body: multipartData,
@@ -281,6 +279,7 @@ cron.schedule('0 0 * * *', async () => {
         console.error('清理错误:', err.message);
     }
 });
+
 
 
 
