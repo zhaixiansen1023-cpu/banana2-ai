@@ -867,13 +867,29 @@
             input.value = ''; // 清空，允许重复上传
         }
 
-        function renderRefTray() {
-            const container = document.getElementById('ref-image-tray');
+       function renderRefTray() {
+            // 🔴 修正：这里原来写的是 'ref-image-tray'，改成了 'ref-tray'
+            const container = document.getElementById('ref-tray');
+            if (!container) return; //以此防止报错
+
             if (!refImages.length) {
                 container.innerHTML = '';
                 container.classList.add('hidden');
                 return;
             }
+
+            container.classList.remove('hidden');
+            // 更新计数器 (可选，优化体验)
+            const countLabel = document.getElementById('ref-count');
+            if(countLabel) countLabel.innerText = `${refImages.length}/10`;
+
+            container.innerHTML = refImages.map(img => `
+                <div class="relative group w-16 h-16 flex-shrink-0">
+                    <img src="${img.base64}" class="w-full h-full object-cover rounded border border-gray-200 ${selectedRefIds.has(img.id) ? 'ring-2 ring-blue-500' : ''}" onclick="toggleRef(${img.id})">
+                    <button onclick="removeRef(${img.id})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
+                </div>
+            `).join('');
+        }
 
             container.classList.remove('hidden');
             container.innerHTML = refImages.map(img => `
@@ -1204,6 +1220,7 @@
     </script>
 </body>
 </html>
+
 
 
 
