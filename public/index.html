@@ -961,7 +961,7 @@
         }
 
       // =======================================================
-        // 🚀 V7.2 最终版 (支持自动排队挤号 + 超长待机)
+        // 🚀 V8.0 最终修复版 (修复Storage入库 + 同步恢复)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -972,7 +972,6 @@
             abortController = new AbortController();
             const signal = abortController.signal;
 
-            // UI 初始化
             btn.innerText = "⏳ 正在请求中...";
             btn.classList.replace('btn-primary', 'bg-gray-400');
             btn.disabled = true; 
@@ -987,29 +986,22 @@
             const painterModelId = modelConfig.id;
             
             try {
-                // --- 1. 参数准备 ---
+                // 1. 准备提示词
                 let finalPrompt = userPrompt;
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
                 if (selectedQuality === '2k') finalPrompt += ", 2k resolution";
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution";
 
-                // 尺寸参数
+                // 2. 准备尺寸 (前端只负责传原始意图，后端会根据模型类型自动转)
+                // 这里我们统一传像素，后端如果是异步会自动转成比例
                 let sizeParam = "1024x1024";
-                if (painterModelId.includes('async')) {
-                    if (aspectStr === "16:9") sizeParam = "16:9";
-                    else if (aspectStr === "3:4") sizeParam = "3:4";
-                    else sizeParam = "1:1";
-                } else {
-                    if (aspectStr === "16:9") sizeParam = "1792x1024";
-                    else if (aspectStr === "3:4") sizeParam = "1024x1792";
-                    else sizeParam = "1024x1024";
-                }
+                if (aspectStr === "16:9") sizeParam = "1792x1024";
+                else if (aspectStr === "3:4") sizeParam = "1024x1792";
                 
-                // 图片上传 (保持原样)
+                // 3. 参考图上传 (略，保持原有逻辑)
                 const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
                 let refImageUrls = [];
                 let tempUploadPaths = [];
-
                 if (selectedImages.length > 0) {
                     preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传参考图...</span>`;
                     await Promise.all(selectedImages.map(async (img, index) => {
@@ -1023,85 +1015,89 @@
                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
                 }
 
-                // --- 2. 🟢 核心修改：带自动重试的提交逻辑 ---
-                const payload = { 
-                    model: painterModelId, 
-                    prompt: finalPrompt, 
-                    size: sizeParam, 
-                    n: 1
-                };
-
+                // 4. 提交任务 (带自动重试)
+                const payload = { model: painterModelId, prompt: finalPrompt, size: sizeParam, n: 1 };
                 let json = null;
-                const maxSubmitRetries = 20; // 最多尝试挤号 20 次 (约100秒)
                 
-                for (let i = 0; i < maxSubmitRetries; i++) {
+                // 自动挤号逻辑
+                for (let i = 0; i < 20; i++) {
                     if (signal.aborted) throw new Error("已取消");
+                    
+                    if (i > 0) preview.innerHTML = `<span class="text-orange-500">通道拥堵，第 ${i+1} 次排队中...</span>`;
+                    else preview.innerHTML = '<span class="text-red-600 animate-pulse">正在发送指令...</span>';
 
-                    preview.innerHTML = i === 0 
-                        ? '<span class="animate-pulse text-red-600">正在发送指令...</span>'
-                        : `<span class="animate-pulse text-orange-500">通道拥堵，正在第 ${i+1} 次尝试排队...</span>`;
+                    try {
+                        const res = await fetch('/api/proxy', {
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                            body: JSON.stringify(payload), 
+                            signal: signal 
+                        });
+                        
+                        // 防 502
+                        const contentType = res.headers.get("content-type");
+                        if (!contentType || !contentType.includes("application/json")) {
+                            await new Promise(r => setTimeout(r, 5000)); continue;
+                        }
 
-                    const res = await fetch('/api/proxy', {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                        body: JSON.stringify(payload), 
-                        signal: signal 
-                    });
-
-                    const resData = await res.json();
-
-                    if (res.ok) {
-                        json = resData; // 成功！跳出循环
-                        break;
-                    } else {
-                        // 🟢 智能判断：如果是“队列满”错误，就等待重试
-                        // 错误码 2400013 或消息含 "队列"
-                        const errStr = JSON.stringify(resData);
-                        if (errStr.includes("队列") || errStr.includes("queue") || errStr.includes("2400013")) {
-                            console.warn("队列满，等待重试...");
-                            await new Promise(r => setTimeout(r, 5000)); // 等5秒再试
+                        const resData = await res.json();
+                        if (res.ok) { json = resData; break; }
+                        
+                        // 队列满重试
+                        if (JSON.stringify(resData).includes("2400013") || JSON.stringify(resData).includes("队列")) {
+                            await new Promise(r => setTimeout(r, 5000));
                         } else {
-                            // 其他错误直接抛出
                             throw new Error(resData.error?.message || "请求失败");
                         }
-                    }
+                    } catch (e) { await new Promise(r => setTimeout(r, 5000)); }
                 }
 
-                if (!json) throw new Error("排队超时，请稍后再试（前方拥堵严重）");
+                if (!json) throw new Error("排队超时");
 
-
-                // --- 3. 结果处理 (同步/异步) ---
-                let finalImageUrl = "";
-
-                if (json.id && (!json.data || !json.data[0]?.url)) {
-                    // 异步：进入超长待机轮询
-                    preview.innerHTML = '<span class="animate-pulse text-purple-600">☁️ 提交成功！正在云端绘制...<br>请耐心等待，不要关闭页面</span>';
-                    finalImageUrl = await pollAsyncResult(json.id, session.access_token, signal);
-                } 
-                else if (json.data && json.data[0]) {
-                    // 同步
-                    if (json.data[0].b64_json) {
-                        const blob = base64ToBlob(json.data[0].b64_json, 'image/png');
-                        const path = `${session.user.id}/${Date.now()}.png`;
-                        await db.storage.from('ai-images').upload(path, blob);
-                        const { data } = db.storage.from('ai-images').getPublicUrl(path);
-                        finalImageUrl = data.publicUrl;
-                    } else {
-                        finalImageUrl = json.data[0].url;
-                    }
-                } else {
-                    throw new Error("未知的响应格式");
-                }
-
-                // --- 4. 收尾 ---
-                await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: finalImageUrl });
+                // 5. 结果处理与入库
+                let finalBlob = null;
                 
+                if (json.id && (!json.data || !json.data[0]?.url)) {
+                    // === 异步模式 ===
+                    preview.innerHTML = '<span class="text-purple-600 animate-pulse">☁️ 云端绘制中...<br>(不要关闭页面)</span>';
+                    const remoteUrl = await pollAsyncResult(json.id, session.access_token, signal);
+                    
+                    // 🟢 核心修复：下载远程图片 -> 转 Blob -> 准备上传
+                    preview.innerHTML = '<span class="text-green-600">正在下载并入库...</span>';
+                    // 通过 fetch 下载图片流
+                    const imgRes = await fetch(remoteUrl);
+                    finalBlob = await imgRes.blob();
+
+                } else if (json.data && json.data[0]) {
+                    // === 同步模式 ===
+                    if (json.data[0].b64_json) {
+                        finalBlob = base64ToBlob(json.data[0].b64_json, 'image/png');
+                    } else {
+                         // 如果同步返回的是 URL，也得下载
+                         const imgRes = await fetch(json.data[0].url);
+                         finalBlob = await imgRes.blob();
+                    }
+                }
+
+                // 6. 统一上传 Storage (这一步之前异步漏了，现在补上了)
+                const path = `${session.user.id}/${Date.now()}.png`;
+                const { error: uploadError } = await db.storage.from('ai-images').upload(path, finalBlob, {
+                    contentType: 'image/png'
+                });
+                
+                if (uploadError) throw new Error("入库失败: " + uploadError.message);
+
+                const { data: { publicUrl } } = db.storage.from('ai-images').getPublicUrl(path);
+
+                // 7. 写入数据库
+                await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: publicUrl });
+                
+                // 8. 展示
                 preview.innerHTML = `
                     <div class="relative w-full h-full flex items-center justify-center group">
-                        <img src="${finalImageUrl}" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
+                        <img src="${publicUrl}" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
                         <div class="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition">
-                            <button onclick="forceDownload('${finalImageUrl}')" class="bg-white text-black px-6 py-3 rounded-full font-bold shadow-xl">⬇️ 下载</button>
-                            <a href="${finalImageUrl}" target="_blank" class="bg-slate-800 text-white px-4 py-3 rounded-full">🔍</a>
+                            <button onclick="forceDownload('${publicUrl}')" class="bg-white text-black px-6 py-3 rounded-full font-bold shadow-xl">⬇️ 下载</button>
                         </div>
                     </div>
                 `;
@@ -1110,16 +1106,11 @@
                 fetchCredits(); loadGallery(); resetUI_Success();
 
             } catch (e) {
-                if (e.name !== 'AbortError') {
-                    // alert(`❌ 错误: ${e.message}`); // 可以注释掉弹窗，只在预览区显示
-                    preview.innerHTML = `<div class="text-red-500 p-4 text-center">❌ ${e.message}</div>`;
-                } else {
-                    preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
-                }
+                if (e.name !== 'AbortError') preview.innerHTML = `<div class="text-red-500 p-4 text-center">❌ ${e.message}</div>`;
+                else preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
                 resetUI_Success();
             }
         }
-
        // 🟢 辅助函数：轮询查结果 (超长待机版)
         async function pollAsyncResult(taskId, token, signal) {
             // 策略调整：
@@ -1339,6 +1330,7 @@
     </script>
 </body>
 </html>
+
 
 
 
