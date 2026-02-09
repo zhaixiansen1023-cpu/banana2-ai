@@ -51,121 +51,155 @@ app.use(cors(corsOptions));
 
 app.get('/', (req, res) => res.send('Z-AI Server: Secure & Billing Active (Patched)'));
 
-// --- 核心：带扣费逻辑的代理接口 ---
+// --- 核心：智能代理接口 (已适配 Async Banana 格式) ---
 app.post('/api/proxy', async (req, res) => {
-    // 定义变量用于后续可能的退款
     let userForRefund = null;
     let costForRefund = 0;
 
     try {
-        // 1. 身份验证：从请求头里拿 Token
+        // 1. 鉴权
         const authHeader = req.headers.authorization;
-        if (!authHeader) {
-            return res.status(401).json({ error: { message: "未登录：缺少 Authorization 头" } });
-        }
-        const token = authHeader.split(' ')[1]; // 去掉 "Bearer " 前缀
-
-        // 2. 向 Supabase 核实用户身份
+        if (!authHeader) return res.status(401).json({ error: { message: "未登录" } });
+        const token = authHeader.split(' ')[1];
         const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return res.status(403).json({ error: { message: "身份验证失败" } });
+
+        // 2. 准备参数
+        const { model, prompt, size, n, response_format } = req.body;
         
-        if (authError || !user) {
-            return res.status(403).json({ error: { message: "身份验证失败，Token 无效" } });
-        }
+        // 判断是否为特殊的异步模型
+        const isAsyncBanana = model && model.includes('async');
 
-        // 3. 计算扣费金额 (根据画质参数)
-        const reqBody = req.body;
-        let cost = 5; // 默认 1k 价格
-        if (reqBody.model && reqBody.model.includes('4k')) cost = 15;
-        else if (reqBody.model && reqBody.model.includes('2k')) cost = 10;
+        // 3. 计算扣费
+        let cost = 5;
+        if (model.includes('4k')) cost = 15;
+        else if (model.includes('2k')) cost = 10;
 
-        console.log(`用户 ${user.email} 请求生成，预计扣费: ${cost}`);
+        // 4. 执行扣费
+        const { error: creditError } = await supabase.rpc('decrement_credits', { count: cost, x_user_id: user.id });
+        if (creditError) return res.status(402).json({ error: { message: "余额不足" } });
 
-        // 4. 执行扣费 (调用数据库 RPC 函数)
-        const { error: creditError } = await supabase.rpc('decrement_credits', {
-            count: cost,
-            x_user_id: user.id
-        });
-
-        if (creditError) {
-            console.error("扣费失败:", creditError);
-            if (creditError.message && creditError.message.includes('积分不足')) {
-                return res.status(402).json({ error: { message: "余额不足，请充值" } });
-            }
-            return res.status(500).json({ error: { message: "积分系统异常" } });
-        }
-
-        // 记录下来，如果后面 API 调用崩了，好把钱退给人家
         userForRefund = user;
         costForRefund = cost;
 
-        // --- 5. 扣费成功，才允许调用 AI ---
+        // 5. 发送请求给供应商
         const apiKey = process.env.API_KEY;
-        const response = await fetch("https://api.tu-zi.com/v1/images/generations", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(reqBody),
-            agent: ignoreSSL // 🟢 新增：强制忽略 SSL 证书报错
-        });
+        let response;
 
-        // 🟢 新增：防崩坏逻辑
-        // 先检查对方状态码，如果不是 200 OK，千万别解析 JSON，否则会报错 "Unexpected token B"
-        if (!response.ok) {
-            const errorText = await response.text(); // 以文本形式读取错误
-            console.error(`❌ 供应商报错 (${response.status}):`, errorText);
-
-            // 💰 自动退款逻辑：供应商挂了，必须把积分退给用户
-            if (userForRefund) {
-                console.warn(`正在为用户 ${userForRefund.email} 执行退款: ${costForRefund} 积分...`);
-                await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
-            }
+        if (isAsyncBanana) {
+            // ==========================================
+            // 🍌 针对异步香蕉格式的特殊处理 (Multipart)
+            // ==========================================
+            const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
             
-            // 把错误原样扔回给前端，自己别崩
-            return res.status(response.status).json({
-                error: { message: `供应商服务异常 (${response.status})，积分已自动退回。` },
-                details: errorText.substring(0, 200) 
+            // 手动构建 multipart/form-data body
+            let bodyParts = [];
+            
+            // 添加文本字段
+            const appendField = (name, value) => {
+                bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`);
+            };
+            
+            appendField('model', model);
+            appendField('prompt', prompt);
+            appendField('size', size); // 这里前端传来的已经是 "16:9" 格式了
+
+            // 如果有参考图 (从 prompt 里提取 --sref 链接，或者简单处理)
+            // 这里为了简化，我们暂时只处理纯文本生成。
+            // 如果你需要带图，逻辑会复杂很多，目前先保证文字生图跑通。
+
+            bodyParts.push(`--${boundary}--`);
+
+            response = await fetch("https://api.tu-zi.com/v1/videos", { // 🟢 注意：这里变成了 /videos
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`
+                },
+                body: bodyParts.join(''),
+                agent: ignoreSSL
+            });
+
+        } else {
+            // ==========================================
+            // 🛡️ 原有的 OpenAI 格式处理 (JSON)
+            // ==========================================
+            response = await fetch("https://api.tu-zi.com/v1/images/generations", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(req.body),
+                agent: ignoreSSL
             });
         }
 
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Provider Error:", errText);
+            // 失败退款
+            await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+            return res.status(response.status).json({ error: { message: "服务商报错，积分已退回" }, details: errText });
+        }
+
         const data = await response.json();
+        
+        // 🟢 修正返回格式：让前端能统一识别 id
+        // 香蕉格式返回的是 { id: "...", status: "queued" ... }
+        // OpenAI 格式返回的是 { data: [...] }
         res.status(200).json(data);
 
     } catch (error) {
-        console.error("Proxy Error:", error);
-        
-        // 💰 发生代码级异常（如网络中断），也要退款
-        if (userForRefund) {
-            console.warn(`系统异常，执行退款: ${costForRefund} 积分...`);
-            await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
-        }
-
-        res.status(500).json({ error: { message: "服务器内部错误，积分已退回" } });
+        console.error("System Error:", error);
+        if (userForRefund) await supabase.rpc('increment_credits', { count: costForRefund, x_user_id: userForRefund.id });
+        res.status(500).json({ error: { message: "服务器内部错误" } });
     }
 });
-// --- 🟢 新增：查询异步任务状态的接口 ---
+
+// --- 🟢 升级：查询异步任务状态 (适配 /videos/{id}) ---
 app.get('/api/proxy/tasks/:id', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader) return res.status(401).json({ error: { message: "未登录" } });
-        
         const token = authHeader.split(' ')[1];
+        
+        // 简单鉴权
         const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error || !user) return res.status(403).json({ error: { message: "Token无效" } });
+        if (error || !user) return res.status(403).json({ error: { message: "无效用户" } });
 
         const taskId = req.params.id;
         const apiKey = process.env.API_KEY;
 
-        // 转发查询请求到 Tuzi API
-        const response = await fetch(`https://api.tu-zi.com/v1/tasks/${taskId}`, {
+        // 🟢 智能路由：根据 ID 格式或尝试逻辑决定去哪个接口
+        // 香蕉文档说查询路径是 /v1/videos/{id}
+        // 为了保险，我们直接请求 /videos 接口，因为我们在 POST 里用的就是它
+        const response = await fetch(`https://api.tu-zi.com/v1/videos/${taskId}`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${apiKey}` },
-            agent: ignoreSSL 
+            agent: ignoreSSL
         });
 
         const data = await response.json();
-        res.status(response.status).json(data);
+
+        // 🟢 数据清洗：把香蕉的返回格式转换成前端能看懂的通用格式
+        // 香蕉返回: { status: "completed", video_url: "..." }
+        // 前端期待: { status: "SUCCESS", output: { url: "..." } }
+        
+        let standardData = { status: "PROCESSING" }; // 默认处理中
+
+        if (data.status === 'completed') {
+            standardData.status = 'SUCCESS';
+            standardData.output = { url: data.video_url }; // 映射 video_url 到 url
+        } else if (data.status === 'failed') {
+            standardData.status = 'FAILED';
+            standardData.error = "任务生成失败";
+        } else {
+            standardData.status = data.status; // queued, processing 等
+        }
+
+        res.status(200).json(standardData);
+
     } catch (error) {
         console.error("Task Query Error:", error);
         res.status(500).json({ error: { message: "查询失败" } });
@@ -237,4 +271,5 @@ cron.schedule('0 0 * * *', async () => {
         console.error('❌ 清理失败:', err.message);
     }
 });
+
 
