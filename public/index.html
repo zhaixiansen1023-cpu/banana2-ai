@@ -625,15 +625,13 @@
         </main>
     </div>
 
-<script>
-        // =======================================================
-        // 1. 全局配置 (适配最新的异步模型)
-        // =======================================================
+    <script>
+        // --- 6.1 全局配置与状态 ---
         const SERVER_CONFIG = {
             MODELS: {
-                '1k': 'gemini-3-pro-image-preview-async',
-                '2k': 'gemini-3-pro-image-preview-2k-async',
-                '4k': 'gemini-3-pro-image-preview-4k-async'
+                '1k': 'gemini-3-pro-image-preview',
+                '2k': 'gemini-3-pro-image-preview-2k',
+                '4k': 'gemini-3-pro-image-preview-4k'
             }
         };
 
@@ -643,41 +641,76 @@
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        // --- 状态变量 ---
         let refImages = []; 
         let selectedRefIds = new Set();
         let isSelectMode = false; 
         let selectedIds = new Set();
         let currentLightboxId = null; 
+        let currentLightboxUrl = null; 
+        let currentLightboxPath = null;
         let currentStylePrompt = ""; 
         let abortController = null; 
 
-        // --- 积分与画质 ---
+        // 积分系统变量
         let currentCredits = 0;
         let selectedQuality = '1k'; 
         let currentCost = 5;        
 
-        // --- 分页系统 ---
+        // 分页系统变量
         let currentPage = 0; 
         const PAGE_SIZE = 20; 
         let hasMoreImages = true;
 
-        // --- 风格数据 ---
+       // --- V6.8 最终版配置：使用本地 assets 路径 ---
         const styles = [
-            { name: "默认", img: "assets/PixPin_2026-01-11_18-47-57.jpg", prompt: "" },
-            { name: "建筑白模", img: "assets/80082030d5fda554b772704dc3bdb4b9.jpg", prompt: "architectural model rendering, white clay material, monochrome, miniature scale, clean lines, abstract form, studio lighting, soft shadows, untextured, minimalist aesthetic" },
-            { name: "简约现代", img: "assets/e11796b490c9e9ff20961a0738e5e010.jpg", prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k" },
-            { name: "夜景", img: "assets/7de3bb7cff3f320483eca75de59c3145.jpg", prompt: "night scene architecture, building illuminated from within, glowing windows, street lights, dramatic artificial lighting, blue hour sky, deep shadows, cinematic atmosphere, photorealistic" },
-            { name: "赛博朋克", img: "assets/c9ac6cf53e2b60718df293aaa5ca0edd.jpg", prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting" },
-            { name: "新中式", img: "assets/e567b8b5ce1c63887d9a6f3c72369308.jpg", prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic" },
-            { name: "扎哈流体", img: "assets/5c5c26205f1cccb8788b6b78ad85feba.jpg", prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting" },
-            { name: "工业风", img: "assets/1285cce92fcdcbcc1dac485bf7b93077.jpg", prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows" },
-            { name: "森之屋", img: "assets/2241af18711c385f0691c3cf9ec9840e.jpg", prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves" }
+            {
+                name: "默认",
+                img: "assets/PixPin_2026-01-11_18-47-57.jpg",
+                prompt: ""
+            },
+            {
+                name: "建筑白模",
+                img: "assets/80082030d5fda554b772704dc3bdb4b9.jpg",
+                prompt: "architectural model rendering, white clay material, monochrome, miniature scale, clean lines, abstract form, studio lighting, soft shadows, untextured, minimalist aesthetic"
+            },
+            {
+                name: "简约现代",
+                img: "assets/e11796b490c9e9ff20961a0738e5e010.jpg",
+                prompt: "minimalist architecture, white concrete, clean lines, bauhaus style, bright natural lighting, photorealistic, 8k"
+            },
+            {
+                name: "夜景",
+                img: "assets/7de3bb7cff3f320483eca75de59c3145.jpg",
+                prompt: "night scene architecture, building illuminated from within, glowing windows, street lights, dramatic artificial lighting, blue hour sky, deep shadows, cinematic atmosphere, photorealistic"
+            },
+            {
+                name: "赛博朋克",
+                img: "assets/c9ac6cf53e2b60718df293aaa5ca0edd.jpg",
+                prompt: "cyberpunk architecture, neon lights, futuristic city, night, rain, high tech, blade runner style, volumetric lighting"
+            },
+            {
+                name: "新中式",
+                img: "assets/e567b8b5ce1c63887d9a6f3c72369308.jpg",
+                prompt: "modern chinese architecture, wooden structure, traditional roof details, zen garden, misty atmosphere, ink painting style aesthetic"
+            },
+            {
+                name: "扎哈流体",
+                img: "assets/5c5c26205f1cccb8788b6b78ad85feba.jpg",
+                prompt: "parametric architecture, zaha hadid style, fluid curves, futuristic facade, steel and glass, organic shape, cinematic lighting"
+            },
+            {
+                name: "工业风",
+                img: "assets/1285cce92fcdcbcc1dac485bf7b93077.jpg",
+                prompt: "industrial loft style, exposed brick, raw concrete, steel beams, large windows, brutalist architecture, dramatic shadows"
+            },
+            {
+                name: "森之屋",
+                img: "assets/2241af18711c385f0691c3cf9ec9840e.jpg",
+                prompt: "biophilic architecture, vertical forest, covered in plants, sustainable design, wood and glass, sunlight filtering through leaves"
+            }
         ];
         
-        // =======================================================
-        // 2. 初始化与监听
-        // =======================================================
+        // --- 6.2 初始化与监听 ---
         window.onload = async () => {
             const { data: { session } } = await db.auth.getSession();
             if (session) {
@@ -695,7 +728,7 @@
             renderStyles();
         };
 
-        // --- 积分逻辑 ---
+        // --- 6.3 积分逻辑 (后端同步) ---
         async function fetchCredits() {
             const { data: { user } } = await db.auth.getUser();
             if (!user) return;
@@ -723,201 +756,13 @@
             updateCreditUI();
         }
 
-        // =======================================================
-        // 3. 核心生成逻辑
-        // =======================================================
-        async function generate() {
-            const btn = document.getElementById('btn-gen');
-            const preview = document.getElementById('preview');
-            
-            if (currentCredits < currentCost) return alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
-
-            abortController = new AbortController();
-            const signal = abortController.signal;
-
-            // 1. 改变按钮状态
-            btn.innerText = "⏳ 正在排队生成 (请耐心等待...)";
-            btn.classList.replace('btn-primary', 'bg-gray-400');
-            btn.disabled = true;
-
-            const { data: { session } } = await db.auth.getSession();
-            if (!session) return alert("请重新登录");
-            const token = session.access_token; 
-
-            let userPrompt = document.getElementById('prompt').value; 
-            const aspectValue = document.getElementById('aspect').value; 
-            const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
-
-            try {
-                let finalPrompt = userPrompt; 
-                if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                
-                preview.innerHTML = '<span class="animate-pulse text-blue-600">正在提交任务...</span>';
-
-                // --- 收集参考图数据 ---
-                const imagesToSend = refImages.map(img => img.base64);
-
-                // --- 构造请求 ---
-                const payload = { 
-                    model: painterModelId, 
-                    prompt: finalPrompt, 
-                    size: aspectValue === 'original' ? '16:9' : aspectValue,
-                    images: imagesToSend
-                };
-
-                // 发送给后端代理
-                const res = await fetch('/api/proxy', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(payload), 
-                    signal: signal 
-                });
-
-                if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.error?.message || "生成请求失败");
-                }
-
-                const json = await res.json();
-                
-                // --- 成功获取结果 ---
-                preview.innerHTML = '<span class="text-green-600">下载并保存中...</span>';
-                
-                const remoteUrl = json.data[0].url;
-
-                // --- 转存到 Supabase ---
-                const imgRes = await fetch(remoteUrl);
-                const imgBlob = await imgRes.blob();
-
-                const path = `${session.user.id}/${Date.now()}.png`; 
-                await db.storage.from('ai-images').upload(path, imgBlob, { contentType: 'image/png' });
-                const {data:{publicUrl}} = db.storage.from('ai-images').getPublicUrl(path);
-                
-                // 写入数据库
-                await db.from('images').insert({ 
-                    user_id: session.user.id, 
-                    prompt: finalPrompt, 
-                    image_url: publicUrl, 
-                    file_path: path 
-                });
-                
-                // --- 显示最终结果 ---
-                preview.innerHTML = `
-                    <div class="relative w-full h-full flex items-center justify-center group">
-                        <img src="${publicUrl}" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
-                        <div class="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
-                            <button onclick="forceDownload('${publicUrl}')" class="bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-red-50 hover:text-red-600 transition flex items-center gap-2">
-                                <span>⬇️</span> 下载原图
-                            </button>
-                            <a href="${publicUrl}" target="_blank" class="bg-slate-800/80 backdrop-blur text-white px-4 py-3 rounded-full hover:bg-slate-900 transition" title="新窗口打开">
-                                🔍
-                            </a>
-                        </div>
-                    </div>
-                `;
-                
-                fetchCredits(); 
-                loadGallery(); 
-                resetUI_Success();
-
-            } catch (e) {
-                if(e.name !== 'AbortError') {
-                    console.error(e);
-                    alert(`😔 生成失败: ${e.message}`);
-                    preview.innerHTML = `<span class="text-red-500 text-sm p-4 text-center">❌ ${e.message}</span>`;
-                }
-                resetUI_Success();
-            }
-        }
-
-        function resetUI_Success() {
-            const btn = document.getElementById('btn-gen');
-            abortController = null;
-            btn.onclick = generate;
-            btn.classList.remove('bg-gray-400', 'hover:bg-gray-500', 'text-white');
-            btn.classList.add('btn-primary');
-            btn.disabled = false;
-            btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
-        }
-
-        // =======================================================
-        // 4. 上传与垫图 (✅ 修正版：ID 已改为 ref-tray)
-        // =======================================================
-        function handleImageUpload(input) {
-            const files = input.files;
-            if (!files.length) return;
-            
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    refImages.push({
-                        id: Date.now() + Math.random(),
-                        base64: e.target.result,
-                        file: file
-                    });
-                    renderRefTray();
-                };
-                reader.readAsDataURL(file);
-            });
-            input.value = ''; 
-        }
-
-        function renderRefTray() {
-            // 🟢 关键修复：这里的 ID 必须和 HTML 里的 <div id="ref-tray"> 对应！
-            const container = document.getElementById('ref-tray');
-            if (!container) return; // 防止找不到元素报错
-
-            // 更新计数器
-            const countLabel = document.getElementById('ref-count');
-            if(countLabel) countLabel.innerText = `${refImages.length}/10`;
-
-            if (!refImages.length) {
-                container.innerHTML = '';
-                container.classList.add('hidden');
-                return;
-            }
-
-            container.classList.remove('hidden');
-            container.innerHTML = refImages.map(img => `
-                <div class="relative group w-16 h-16 flex-shrink-0">
-                    <img src="${img.base64}" class="w-full h-full object-cover rounded border border-gray-200 ${selectedRefIds.has(img.id) ? 'ring-2 ring-blue-500' : ''}" onclick="toggleRef(${img.id})">
-                    <button onclick="removeRef(${img.id})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
-                </div>
-            `).join('');
-        }
-
-        function toggleRef(id) {
-            if (selectedRefIds.has(id)) selectedRefIds.delete(id);
-            else selectedRefIds.add(id);
-            renderRefTray();
-        }
-
-        function removeRef(id) {
-            refImages = refImages.filter(img => img.id !== id);
-            selectedRefIds.delete(id);
-            renderRefTray();
-        }
-
-        // =======================================================
-        // 5. 辅助工具 & 画廊 & 认证
-        // =======================================================
+        // --- 6.4 身份验证与视图切换 (🟢 修正版) ---
         
-        async function forceDownload(url) {
-            try {
-                const res = await fetch(url);
-                const blob = await res.blob();
-                const a = document.createElement('a');
-                a.href = window.URL.createObjectURL(blob);
-                a.download = `Z-Design-${Date.now()}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            } catch(e) { window.open(url, '_blank'); }
-        }
-
+        // 切换登录/注册视图
         function switchAuth(mode) {
             const loginCard = document.getElementById('card-login');
             const registerCard = document.getElementById('card-register');
+
             if (mode === 'register') {
                 loginCard.classList.add('hidden');
                 registerCard.classList.remove('hidden');
@@ -928,46 +773,46 @@
         }
 
         async function signUp() { 
+            // 注意：使用专用的注册输入框
             const email = document.getElementById('reg-email').value.trim();
             const password = document.getElementById('reg-password').value.trim();
+            
             if (!email || !password) return alert("请输入注册邮箱和密码");
 
             try {
-                const { data: exists, error: checkError } = await db.rpc('check_email_exists', { email_input: email });
+                // 先检查邮箱是否存在
+                const { data: exists, error: checkError } = await db.rpc('check_email_exists', { 
+                    email_input: email 
+                });
+
                 if (checkError) throw checkError;
+
                 if (exists) {
                     alert("❌ 该邮箱已被注册，请直接登录！");
                     switchAuth('login');
                     return;
                 }
+
                 const { error } = await db.auth.signUp({ email, password });
+                
                 if (error) {
                     alert("注册失败: " + error.message);
                 } else {
                     alert("✅ 注册请求已发送！\n请查收邮件，然后登录。");
                     switchAuth('login');
+                    // 自动填入邮箱
                     document.getElementById('email').value = email;
                     document.getElementById('password').value = ''; 
                 }
+
             } catch (err) {
                 console.error("Error:", err);
                 alert("系统错误，请稍后重试");
             }
         }
 
-        async function signIn() { 
-            const email=document.getElementById('email').value, password=document.getElementById('password').value; 
-            const {error}=await db.auth.signInWithPassword({email,password}); 
-            if(error) alert(error.message); 
-        }
-        
-        async function forgotPassword() { 
-            const email=document.getElementById('email').value; 
-            if(!email) return alert("请先输入邮箱"); 
-            const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); 
-            if(error) alert(error.message); else alert("重置邮件已发送"); 
-        }
-        
+        async function signIn() { const email=document.getElementById('email').value, password=document.getElementById('password').value; const {error}=await db.auth.signInWithPassword({email,password}); if(error) alert(error.message); }
+        async function forgotPassword() { const email=document.getElementById('email').value; if(!email) return alert("请先输入邮箱"); const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) alert(error.message); else alert("重置邮件已发送"); }
         async function signOut() { await db.auth.signOut(); }
         
         function enterApp(user) { 
@@ -993,6 +838,7 @@
             location.reload();
         }
 
+        // --- 6.5 UI 渲染逻辑 ---
         function renderStyles() { 
             document.getElementById('style-container').innerHTML = styles.map((s, index) => `
                 <div class="style-card ${index === 0 ? 'active' : ''}" 
@@ -1009,7 +855,43 @@
             document.getElementById('style-name').innerText = s.name; 
         }
         
-        // --- 画廊加载 ---
+        // --- 6.6 上传与垫图管理 ---
+        function handleImageUpload(input) { 
+            const files = Array.from(input.files); 
+            if (!files.length) return; 
+            if (refImages.length + files.length > 10) return alert("最多10张参考图！"); 
+            files.forEach(file => { 
+                const reader = new FileReader(); 
+                reader.onload = (e) => { 
+                    const id = Date.now() + Math.random(); 
+                    refImages.push({ id: id, base64: e.target.result }); 
+                    selectedRefIds.add(id); 
+                    renderRefTray(); 
+                }; 
+                reader.readAsDataURL(file); 
+            }); 
+            input.value = ''; 
+        }
+        
+        function renderRefTray() { 
+            const tray = document.getElementById('ref-tray'); 
+            const countLabel = document.getElementById('ref-count'); 
+            const placeholder = document.getElementById('upload-placeholder'); 
+            countLabel.innerText = `${refImages.length}/10`; 
+            if (refImages.length > 0) { 
+                tray.classList.remove('hidden'); placeholder.classList.add('h-12'); placeholder.innerHTML = '<span class="text-sm font-bold text-red-500">+ 继续添加</span>'; 
+            } else { 
+                tray.classList.add('hidden'); placeholder.classList.remove('h-12'); placeholder.innerHTML = '<span class="text-2xl mb-1">📷</span><span class="text-xs font-medium">点击或拖拽上传图片</span>'; 
+            } 
+            tray.innerHTML = refImages.map((img, index) => `
+                <div class="ref-thumb ${selectedRefIds.has(img.id) ? 'selected' : ''}" onclick="toggleRef(${img.id})">
+                    <img src="${img.base64}"><div class="ref-number">${index + 1}</div><div class="del-btn" onclick="event.stopPropagation(); removeRef(${img.id})">✕</div>
+                </div>`).join(''); 
+        }
+        function toggleRef(id) { if (selectedRefIds.has(id)) selectedRefIds.delete(id); else selectedRefIds.add(id); renderRefTray(); }
+        function removeRef(id) { refImages = refImages.filter(img => img.id !== id); selectedRefIds.delete(id); renderRefTray(); }
+
+        // --- 6.7 分页画廊加载 ---
         async function loadGallery(reset = true) { 
             const { data: { user } } = await db.auth.getUser();
             if (!user) return; 
@@ -1026,7 +908,7 @@
             
             btnMore.innerText = "加载中...";
             
-            const { data } = await db
+            const { data, error } = await db
                 .from('images')
                 .select('*')
                 .eq('user_id', user.id)
@@ -1078,6 +960,207 @@
             else grid.innerHTML = html;
         }
 
+      // =======================================================
+        // 🚀 V7.0 智能生成逻辑 (自动适配同步/异步)
+        // =======================================================
+        async function generate() {
+            const btn = document.getElementById('btn-gen');
+            const preview = document.getElementById('preview');
+            
+            if (currentCredits < currentCost) return alert(`积分不足！需要 ${currentCost} 分，当前 ${currentCredits} 分。`);
+
+            abortController = new AbortController();
+            const signal = abortController.signal;
+
+            // UI 状态变更
+            btn.innerText = "⏳ 正在请求中...";
+            btn.classList.replace('btn-primary', 'bg-gray-400');
+            btn.disabled = true; // 防止重复点击
+
+            const { data: { session } } = await db.auth.getSession();
+            if (!session) return alert("请重新登录");
+            
+            // 获取用户输入的参数
+            const userPrompt = document.getElementById('prompt').value;
+            const aspectStr = document.getElementById('aspect').value;
+            // 🟢 直接读取当前选中的配置
+            const painterModelId = SERVER_CONFIG.MODELS[selectedQuality];
+            
+            try {
+                // --- 1. 准备提示词和参数 ---
+                let finalPrompt = userPrompt;
+                if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
+                if (selectedQuality === '2k') finalPrompt += ", 2k resolution";
+                if (selectedQuality === '4k') finalPrompt += ", 4k resolution";
+
+                let sizeParam = "1024x1024";
+                if (aspectStr === "16:9") sizeParam = "1792x1024";
+                else if (aspectStr === "3:4") sizeParam = "1024x1792";
+                
+                // 处理参考图上传 (保持原有逻辑)
+                const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
+                let refImageUrls = [];
+                let tempUploadPaths = [];
+
+                if (selectedImages.length > 0) {
+                    preview.innerHTML = `<span class="animate-pulse text-blue-600">正在上传参考图...</span>`;
+                    await Promise.all(selectedImages.map(async (img, index) => {
+                        const blob = base64ToBlob(img.base64, 'image/png');
+                        const tempName = `temp/${session.user.id}/${Date.now()}_${index}.png`;
+                        await db.storage.from('ai-images').upload(tempName, blob);
+                        tempUploadPaths.push(tempName);
+                        const { data } = db.storage.from('ai-images').getPublicUrl(tempName);
+                        refImageUrls.push(data.publicUrl);
+                    }));
+                    finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
+                }
+
+                // --- 2. 发送请求 ---
+                preview.innerHTML = '<span class="animate-pulse text-red-600">正在发送指令...</span>';
+                
+                const payload = { 
+                    model: painterModelId, 
+                    prompt: finalPrompt, 
+                    size: sizeParam, 
+                    n: 1
+                };
+
+                const res = await fetch('/api/proxy', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify(payload), 
+                    signal: signal 
+                });
+
+                const json = await res.json();
+                if (res.status !== 200) throw new Error(json.error?.message || "请求失败");
+
+                // --- 3. 🟢 智能判断：是直接给图了，还是给了任务ID？ ---
+                let finalImageUrl = "";
+
+                // 情况A：异步任务（返回了 id，但没有 images 数组）
+                if (json.id && (!json.data || !json.data[0]?.url)) {
+                    preview.innerHTML = '<span class="animate-pulse text-purple-600">☁️ 云端绘制中...<br>请稍候，系统正在排队处理</span>';
+                    // 进入轮询模式
+                    finalImageUrl = await pollAsyncResult(json.id, session.access_token, signal);
+                } 
+                // 情况B：同步任务（直接返回了 url 或 base64）
+                else if (json.data && json.data[0]) {
+                    if (json.data[0].b64_json) {
+                        // 如果是 base64，转成文件传到 Supabase
+                        const blob = base64ToBlob(json.data[0].b64_json, 'image/png');
+                        const path = `${session.user.id}/${Date.now()}.png`;
+                        await db.storage.from('ai-images').upload(path, blob);
+                        const { data } = db.storage.from('ai-images').getPublicUrl(path);
+                        finalImageUrl = data.publicUrl;
+                    } else {
+                        // 如果是 URL，直接用
+                        finalImageUrl = json.data[0].url;
+                    }
+                } else {
+                    throw new Error("未知的响应格式");
+                }
+
+                // --- 4. 成功展示与保存 ---
+                // 存入数据库
+                await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: finalImageUrl });
+                
+                // 显示图片（带下载按钮）
+                preview.innerHTML = `
+                    <div class="relative w-full h-full flex items-center justify-center group">
+                        <img src="${finalImageUrl}" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
+                        <div class="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition">
+                            <button onclick="forceDownload('${finalImageUrl}')" class="bg-white text-black px-6 py-3 rounded-full font-bold shadow-xl">⬇️ 下载</button>
+                            <a href="${finalImageUrl}" target="_blank" class="bg-slate-800 text-white px-4 py-3 rounded-full">🔍</a>
+                        </div>
+                    </div>
+                `;
+
+                // 清理临时文件
+                if (tempUploadPaths.length > 0) await db.storage.from('ai-images').remove(tempUploadPaths);
+                
+                fetchCredits(); loadGallery(); resetUI_Success();
+
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    alert(`❌ 错误: ${e.message}`);
+                    preview.innerHTML = `<span class="text-red-500 p-4">${e.message}</span>`;
+                } else {
+                    preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
+                }
+                resetUI_Success();
+            }
+        }
+
+        // 🟢 辅助函数：轮询查结果
+        async function pollAsyncResult(taskId, token, signal) {
+            const maxRetries = 60; // 最多等 2 分钟 (60 * 2s)
+            
+            for (let i = 0; i < maxRetries; i++) {
+                if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                
+                // 请求后端查进度
+                const res = await fetch(`/api/proxy/tasks/${taskId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await res.json();
+                
+                // Tuzi API 常见的成功状态判断
+                if (data.status === 'SUCCESS' || data.status === 'succeeded') {
+                    // 尝试获取结果图（不同模型字段可能不同，这里做了兼容）
+                    const url = data.output?.url || data.data?.results?.[0]?.url || data.url;
+                    if (url) return url;
+                }
+                
+                if (data.status === 'FAILED' || data.status === 'failed') {
+                    throw new Error(data.error || "任务生成失败");
+                }
+                
+                // 还没好，等 2 秒再问
+                await new Promise(r => setTimeout(r, 2000));
+            }
+            throw new Error("等待超时，请稍后在画廊查看");
+        }
+
+        function resetUI_Success() {
+            const btn = document.getElementById('btn-gen');
+            abortController = null;
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-400');
+            btn.classList.add('btn-primary');
+            btn.innerText = `🚀 立即生成 (消耗 ${currentCost} 积分)`;
+        }
+
+        // --- 6.9 辅助工具函数 ---
+        
+        // 🟢 新增：强制下载图片函数
+        async function forceDownload(url) {
+            try {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                a.href = window.URL.createObjectURL(blob);
+                a.download = `Z-Design-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch(e) { window.open(url, '_blank'); }
+        }
+
+        function base64ToBlob(base64, mimeType) {
+            const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '').replace(/\s/g, '');
+            const byteCharacters = atob(cleanBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) { 
+                byteNumbers[i] = byteCharacters.charCodeAt(i); 
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+
+        // --- 6.10 杂项 & 修复下载/画廊 (V6.5 修复版) ---
         function handleCardClick(id,url,path) { 
             if (isSelectMode) { 
                 if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); 
@@ -1158,9 +1241,7 @@
         
         function switchTab(t) { ['create','gallery','profile'].forEach(v=>{document.getElementById('view-'+v).classList.add('hidden');document.getElementById('tab-'+v).classList.remove('text-red-600','bg-red-50','border-r-2','border-red-600')}); document.getElementById('view-'+t).classList.remove('hidden');document.getElementById('tab-'+t).classList.add('text-red-600','bg-red-50','border-r-2','border-red-600'); if(t==='gallery') loadGallery(true); }
 
-        // ==========================================
-        // 🔴 意见反馈 (✅ 完整数据库逻辑)
-        // ==========================================
+        // --- 6.11 意见反馈逻辑 ---
         async function submitFeedback() {
             const btn = document.getElementById('btn-submit-feedback');
             const contentInput = document.getElementById('feedback-content');
@@ -1206,9 +1287,6 @@
     </script>
 </body>
 </html>
-
-
-
 
 
 
