@@ -28,18 +28,17 @@ if (missingEnv.length > 0) {
     }
 }
 
-// [修改] 彻底移除 keepAlive，改用默认设置 + 强制短连接
-// 这能有效解决 "Bad Gateway" 和连接复用导致的 EOF 问题
+// [修改] 彻底移除 keepAlive，防止 502 Bad Gateway
 const ignoreSSL = new https.Agent({ 
     rejectUnauthorized: false
 });
 const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '50mb' })); // 确保能接收大图片
+app.use(express.json({ limit: '50mb' })); 
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Final Defense Mode)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Type Error Fixed)...'));
 
 // ==================================================================
 // 🟢 2. 模型配置
@@ -54,7 +53,7 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🔵 3. 异步引擎 (🔥缓冲区模式 + 安全解析 + 短连接)
+// 🔵 3. 异步引擎 (🔥Buffer 强转 + 安全解析)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
@@ -84,22 +83,30 @@ async function handleAsyncGeneration(body, apiPath) {
         });
     }
 
-    // 3. 转为 Buffer (防止 EOF)
+    // 3. [🔥核心修复] 转为 Buffer 时强制类型检查
+    // 解决 "list[0] must be an instance of Buffer" 错误
     const formBuffer = await new Promise((resolve, reject) => {
         const chunks = [];
-        form.on('data', (chunk) => chunks.push(chunk));
+        form.on('data', (chunk) => {
+            // 无论 chunk 是字符串还是 Buffer，统统转为 Buffer
+            if (Buffer.isBuffer(chunk)) {
+                chunks.push(chunk);
+            } else {
+                chunks.push(Buffer.from(chunk));
+            }
+        });
         form.on('end', () => resolve(Buffer.concat(chunks)));
         form.on('error', (err) => reject(err));
         form.resume();
     });
 
     // 4. 提交任务
-    // [修复] 强制 Connection: close 防止网关 502
+    // 强制短连接 + 显式 Length
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
             'Authorization': `Bearer ${process.env.API_KEY}`,
-            'Connection': 'close', // 🔥 关键：强制短连接
+            'Connection': 'close', 
             'Accept': 'application/json',
             ...form.getHeaders(),
             'Content-Length': formBuffer.length
@@ -108,23 +115,21 @@ async function handleAsyncGeneration(body, apiPath) {
         agent: ignoreSSL
     });
 
-    // 5. [🔥核心修复] 安全解析响应
-    // 先读文本，再试着转 JSON，防止 "Unexpected token B" 崩溃
+    // 5. 安全解析响应
     const responseText = await submitRes.text();
     let taskData;
 
     try {
         taskData = JSON.parse(responseText);
     } catch (e) {
-        // 如果解析失败，说明服务器返回了 Bad Gateway 或其他 HTML 错误
-        throw new Error(`API 响应异常 (非JSON): ${responseText.substring(0, 200)}`); // 只截取前200字
+        throw new Error(`API 响应异常 (非JSON): ${responseText.substring(0, 200)}`);
     }
 
     if (!submitRes.ok) {
         throw new Error(`提交失败 [${submitRes.status}]: ${JSON.stringify(taskData)}`);
     }
     
-    const taskId = taskData.id || taskData.data?.id; // 兼容不同字段
+    const taskId = taskData.id || taskData.data?.id;
     if (!taskId) throw new Error(`未获取到任务ID: ${responseText}`);
 
     // 6. 轮询等待
@@ -135,14 +140,13 @@ async function handleAsyncGeneration(body, apiPath) {
         const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
             headers: { 
                 'Authorization': `Bearer ${process.env.API_KEY}`,
-                'Connection': 'close' // 轮询也用短连接
+                'Connection': 'close' 
             },
             agent: ignoreSSL
         });
         
         if (!checkRes.ok) continue;
         
-        // 同样的安全解析逻辑
         const checkText = await checkRes.text();
         let statusData;
         try {
@@ -162,7 +166,7 @@ async function handleAsyncGeneration(body, apiPath) {
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口 (保持不变)
+// 🟢 4. 统一调度接口
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -208,7 +212,7 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🟠 5. 同步引擎 (保持不变)
+// 🟠 5. 同步引擎
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
     const baseUrl = "https://api.tu-zi.com"; 
