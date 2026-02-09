@@ -961,7 +961,7 @@
         }
 
       // =======================================================
-        // 🚀 V7.1 最终完整版 (修复分辨率拼接 + 自动适配异步)
+        // 🚀 V7.2 最终版 (支持自动排队挤号 + 超长待机)
         // =======================================================
         async function generate() {
             const btn = document.getElementById('btn-gen');
@@ -972,7 +972,7 @@
             abortController = new AbortController();
             const signal = abortController.signal;
 
-            // UI 状态变更
+            // UI 初始化
             btn.innerText = "⏳ 正在请求中...";
             btn.classList.replace('btn-primary', 'bg-gray-400');
             btn.disabled = true; 
@@ -983,35 +983,29 @@
             // 获取配置
             const userPrompt = document.getElementById('prompt').value;
             const aspectStr = document.getElementById('aspect').value;
-            // 读取当前选中的模型配置 (来自 SERVER_CONFIG)
             const modelConfig = SERVER_CONFIG.MODELS[selectedQuality]; 
-            const painterModelId = modelConfig.id; // 例如 'gemini-3-pro-image-preview-async'
+            const painterModelId = modelConfig.id;
             
             try {
-                // --- 1. 准备提示词 (这里是你指出的补回部分) ---
+                // --- 1. 参数准备 ---
                 let finalPrompt = userPrompt;
                 if (currentStylePrompt) finalPrompt += `, ${currentStylePrompt}`;
-                
-                // 🟢 补回：分辨率关键词拼接
                 if (selectedQuality === '2k') finalPrompt += ", 2k resolution";
                 if (selectedQuality === '4k') finalPrompt += ", 4k resolution";
 
-                // --- 2. 准备尺寸参数 (自动适配) ---
-                let sizeParam = "1024x1024"; // 默认初始值
-                
-                // 判断逻辑：如果模型ID里包含 'async'，说明是新接口，要传比例字符串
+                // 尺寸参数
+                let sizeParam = "1024x1024";
                 if (painterModelId.includes('async')) {
                     if (aspectStr === "16:9") sizeParam = "16:9";
                     else if (aspectStr === "3:4") sizeParam = "3:4";
                     else sizeParam = "1:1";
                 } else {
-                    // 旧接口/同步接口，传像素值
                     if (aspectStr === "16:9") sizeParam = "1792x1024";
                     else if (aspectStr === "3:4") sizeParam = "1024x1792";
                     else sizeParam = "1024x1024";
                 }
                 
-                // --- 3. 处理参考图上传 ---
+                // 图片上传 (保持原样)
                 const selectedImages = refImages.filter(img => selectedRefIds.has(img.id));
                 let refImageUrls = [];
                 let tempUploadPaths = [];
@@ -1026,13 +1020,10 @@
                         const { data } = db.storage.from('ai-images').getPublicUrl(tempName);
                         refImageUrls.push(data.publicUrl);
                     }));
-                    // 拼接参考图参数
                     finalPrompt += ` --sref ${refImageUrls.join(" ")} --iw 2`;
                 }
 
-                // --- 4. 发送请求给 Server ---
-                preview.innerHTML = '<span class="animate-pulse text-red-600">正在发送指令...</span>';
-                
+                // --- 2. 🟢 核心修改：带自动重试的提交逻辑 ---
                 const payload = { 
                     model: painterModelId, 
                     prompt: finalPrompt, 
@@ -1040,27 +1031,55 @@
                     n: 1
                 };
 
-                const res = await fetch('/api/proxy', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify(payload), 
-                    signal: signal 
-                });
+                let json = null;
+                const maxSubmitRetries = 20; // 最多尝试挤号 20 次 (约100秒)
+                
+                for (let i = 0; i < maxSubmitRetries; i++) {
+                    if (signal.aborted) throw new Error("已取消");
 
-                const json = await res.json();
-                if (res.status !== 200) throw new Error(json.error?.message || "请求失败");
+                    preview.innerHTML = i === 0 
+                        ? '<span class="animate-pulse text-red-600">正在发送指令...</span>'
+                        : `<span class="animate-pulse text-orange-500">通道拥堵，正在第 ${i+1} 次尝试排队...</span>`;
 
-                // --- 5. 智能处理结果 (同步直接显示 / 异步轮询) ---
+                    const res = await fetch('/api/proxy', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                        body: JSON.stringify(payload), 
+                        signal: signal 
+                    });
+
+                    const resData = await res.json();
+
+                    if (res.ok) {
+                        json = resData; // 成功！跳出循环
+                        break;
+                    } else {
+                        // 🟢 智能判断：如果是“队列满”错误，就等待重试
+                        // 错误码 2400013 或消息含 "队列"
+                        const errStr = JSON.stringify(resData);
+                        if (errStr.includes("队列") || errStr.includes("queue") || errStr.includes("2400013")) {
+                            console.warn("队列满，等待重试...");
+                            await new Promise(r => setTimeout(r, 5000)); // 等5秒再试
+                        } else {
+                            // 其他错误直接抛出
+                            throw new Error(resData.error?.message || "请求失败");
+                        }
+                    }
+                }
+
+                if (!json) throw new Error("排队超时，请稍后再试（前方拥堵严重）");
+
+
+                // --- 3. 结果处理 (同步/异步) ---
                 let finalImageUrl = "";
 
-                // 判断逻辑：如果有 id 但没 data，就是异步任务
                 if (json.id && (!json.data || !json.data[0]?.url)) {
-                    preview.innerHTML = '<span class="animate-pulse text-purple-600">☁️ 云端绘制中...<br>请稍候，系统正在排队处理</span>';
-                    // 进入轮询等待
+                    // 异步：进入超长待机轮询
+                    preview.innerHTML = '<span class="animate-pulse text-purple-600">☁️ 提交成功！正在云端绘制...<br>请耐心等待，不要关闭页面</span>';
                     finalImageUrl = await pollAsyncResult(json.id, session.access_token, signal);
                 } 
                 else if (json.data && json.data[0]) {
-                    // 同步直接出图
+                    // 同步
                     if (json.data[0].b64_json) {
                         const blob = base64ToBlob(json.data[0].b64_json, 'image/png');
                         const path = `${session.user.id}/${Date.now()}.png`;
@@ -1074,7 +1093,7 @@
                     throw new Error("未知的响应格式");
                 }
 
-                // --- 6. 成功收尾 ---
+                // --- 4. 收尾 ---
                 await db.from('images').insert({ user_id: session.user.id, prompt: finalPrompt, image_url: finalImageUrl });
                 
                 preview.innerHTML = `
@@ -1092,8 +1111,8 @@
 
             } catch (e) {
                 if (e.name !== 'AbortError') {
-                    alert(`❌ 错误: ${e.message}`);
-                    preview.innerHTML = `<span class="text-red-500 p-4">${e.message}</span>`;
+                    // alert(`❌ 错误: ${e.message}`); // 可以注释掉弹窗，只在预览区显示
+                    preview.innerHTML = `<div class="text-red-500 p-4 text-center">❌ ${e.message}</div>`;
                 } else {
                     preview.innerHTML = '<span class="text-gray-400">🚫 已中止</span>';
                 }
@@ -1101,9 +1120,17 @@
             }
         }
 
-        // 🟢 辅助函数：轮询查结果
+       // 🟢 辅助函数：轮询查结果 (超长待机版)
         async function pollAsyncResult(taskId, token, signal) {
-            const maxRetries = 60; // 最多等 2 分钟 (60 * 2s)
+            // 策略调整：
+            // 为了应对 20+ 分钟的超长生成，我们将间隔设为 5 秒
+            // 尝试次数设为 400 次
+            // 总等待时间 = 400 * 5秒 = 2000秒 (约 33 分钟)
+            
+            const maxRetries = 400; 
+            const interval = 5000; // 5秒问一次，避免太频繁被封
+            
+            const preview = document.getElementById('preview'); //以此更新UI提示
             
             for (let i = 0; i < maxRetries; i++) {
                 if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -1116,23 +1143,39 @@
                 
                 const data = await res.json();
                 
-                // Tuzi API 常见的成功状态判断
+                // 更新 UI 提示，让用户知道还没死机
+                // data.progress 是 API 返回的进度 (0-100)，如果没有就估算
+                let progressText = "";
+                if (data.progress !== undefined) {
+                    progressText = `(进度: ${data.progress}%)`;
+                } else {
+                    progressText = `(已等待 ${Math.round(i * 5 / 60)} 分钟)`;
+                }
+                
+                preview.innerHTML = `
+                    <div class="text-center animate-pulse">
+                        <span class="text-purple-600 font-bold text-lg">☁️ 云端绘制中...</span><br>
+                        <span class="text-xs text-gray-500 mt-2">如果是慢速模型，可能需要 10-20 分钟</span><br>
+                        <span class="text-red-500 font-mono text-sm mt-1">${progressText}</span>
+                    </div>
+                `;
+                
+                // 成功判定
                 if (data.status === 'SUCCESS' || data.status === 'succeeded') {
-                    // 尝试获取结果图（不同模型字段可能不同，这里做了兼容）
                     const url = data.output?.url || data.data?.results?.[0]?.url || data.url;
                     if (url) return url;
                 }
                 
+                // 失败判定
                 if (data.status === 'FAILED' || data.status === 'failed') {
                     throw new Error(data.error || "任务生成失败");
                 }
                 
-                // 还没好，等 2 秒再问
-                await new Promise(r => setTimeout(r, 2000));
+                // 还没好，等 5 秒再问
+                await new Promise(r => setTimeout(r, interval));
             }
-            throw new Error("等待超时，请稍后在画廊查看");
+            throw new Error("等待超过 30 分钟，请稍后去后台查看，或重新尝试。");
         }
-
         function resetUI_Success() {
             const btn = document.getElementById('btn-gen');
             abortController = null;
@@ -1296,6 +1339,7 @@
     </script>
 </body>
 </html>
+
 
 
 
