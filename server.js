@@ -1,4 +1,4 @@
-const FormData = require('form-data');
+// const FormData = require('form-data'); // ❌ 弃用第三方库，改用原生拼接
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
@@ -28,7 +28,7 @@ if (missingEnv.length > 0) {
     }
 }
 
-// [修改] 彻底移除 keepAlive，防止 502 Bad Gateway
+// [修改] 强制短连接，避免 502/EOF
 const ignoreSSL = new https.Agent({ 
     rejectUnauthorized: false
 });
@@ -38,7 +38,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Type Error Fixed)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Native Multipart Mode)...'));
 
 // ==================================================================
 // 🟢 2. 模型配置
@@ -53,18 +53,55 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🔵 3. 异步引擎 (🔥Buffer 强转 + 安全解析)
+// 🛠️ 3. [新] 原生 Multipart 拼接函数 (绝对精确控制)
+// ==================================================================
+function buildMultipartPayload(fields, files, boundary) {
+    const CRLF = '\r\n'; // 必须使用 \r\n 换行
+    const chunks = [];
+
+    // 1. 处理普通字段
+    for (const [key, value] of Object.entries(fields)) {
+        if (value === undefined || value === null) continue;
+        chunks.push(Buffer.from(`--${boundary}${CRLF}`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${CRLF}${CRLF}`));
+        chunks.push(Buffer.from(`${value}${CRLF}`));
+    }
+
+    // 2. 处理文件 (Buffer)
+    if (files && files.length > 0) {
+        files.forEach(file => {
+            chunks.push(Buffer.from(`--${boundary}${CRLF}`));
+            chunks.push(Buffer.from(`Content-Disposition: form-data; name="${file.fieldname}"; filename="${file.filename}"${CRLF}`));
+            chunks.push(Buffer.from(`Content-Type: ${file.contentType}${CRLF}${CRLF}`));
+            chunks.push(file.buffer); // 直接推入二进制 Buffer
+            chunks.push(Buffer.from(CRLF)); // 文件末尾换行
+        });
+    }
+
+    // 3. 结束边界 (注意后面的 --)
+    chunks.push(Buffer.from(`--${boundary}--${CRLF}`));
+
+    return Buffer.concat(chunks);
+}
+
+// ==================================================================
+// 🔵 4. 异步引擎 (使用原生拼接，解决 EOF)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
     const baseUrl = "https://api.tu-zi.com";
     
-    // 1. 创建表单
-    const form = new FormData();
-    form.append('model', body.model);
-    form.append('prompt', body.prompt);
-    form.append('size', body.size || "16:9");
+    // 生成一个简单的 Boundary，类似于浏览器
+    const boundary = `----WebKitFormBoundary${Date.now().toString(16)}`;
 
-    // 2. 处理图片
+    // 准备字段
+    const fields = {
+        model: body.model,
+        prompt: body.prompt,
+        size: body.size || "16:9"
+    };
+
+    // 准备文件列表
+    const files = [];
     if (body.images && body.images.length > 0) {
         body.images.forEach((imgStr, index) => {
             if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
@@ -73,52 +110,38 @@ async function handleAsyncGeneration(body, apiPath) {
                     const mimeType = matches[1];
                     const buffer = Buffer.from(matches[2], 'base64');
                     const ext = mimeType.split('/')[1] || 'png';
-                    
-                    form.append('image', buffer, { 
+                    files.push({
+                        fieldname: 'image', // 如果还报错，可以尝试改为 'file'
                         filename: `image_${index}.${ext}`,
-                        contentType: mimeType
+                        contentType: mimeType,
+                        buffer: buffer
                     });
                 }
             }
         });
     }
 
-    // 3. [🔥核心修复] 转为 Buffer 时强制类型检查
-    // 解决 "list[0] must be an instance of Buffer" 错误
-    const formBuffer = await new Promise((resolve, reject) => {
-        const chunks = [];
-        form.on('data', (chunk) => {
-            // 无论 chunk 是字符串还是 Buffer，统统转为 Buffer
-            if (Buffer.isBuffer(chunk)) {
-                chunks.push(chunk);
-            } else {
-                chunks.push(Buffer.from(chunk));
-            }
-        });
-        form.on('end', () => resolve(Buffer.concat(chunks)));
-        form.on('error', (err) => reject(err));
-        form.resume();
-    });
+    // [🔥核心] 手动构建 Payload，不依赖任何第三方库
+    const payloadBuffer = buildMultipartPayload(fields, files, boundary);
 
-    // 4. 提交任务
-    // 强制短连接 + 显式 Length
+    console.log(`[Proxy] 发送 Payload 大小: ${payloadBuffer.length} bytes`);
+
+    // 提交任务
     const submitRes = await fetch(`${baseUrl}${apiPath}`, {
         method: 'POST',
         headers: { 
             'Authorization': `Bearer ${process.env.API_KEY}`,
-            'Connection': 'close', 
-            'Accept': 'application/json',
-            ...form.getHeaders(),
-            'Content-Length': formBuffer.length
+            'Content-Type': `multipart/form-data; boundary=${boundary}`, // 显式指定 boundary
+            'Content-Length': payloadBuffer.length, // 显式指定长度
+            'Connection': 'close'
         },
-        body: formBuffer,
+        body: payloadBuffer,
         agent: ignoreSSL
     });
 
-    // 5. 安全解析响应
+    // 安全解析
     const responseText = await submitRes.text();
     let taskData;
-
     try {
         taskData = JSON.parse(responseText);
     } catch (e) {
@@ -132,7 +155,7 @@ async function handleAsyncGeneration(body, apiPath) {
     const taskId = taskData.id || taskData.data?.id;
     if (!taskId) throw new Error(`未获取到任务ID: ${responseText}`);
 
-    // 6. 轮询等待
+    // 轮询等待
     let attempts = 0;
     while (attempts < 60) {
         await new Promise(r => setTimeout(r, 2000));
@@ -140,7 +163,7 @@ async function handleAsyncGeneration(body, apiPath) {
         const checkRes = await fetch(`${baseUrl}${apiPath}/${taskId}`, {
             headers: { 
                 'Authorization': `Bearer ${process.env.API_KEY}`,
-                'Connection': 'close' 
+                'Connection': 'close'
             },
             agent: ignoreSSL
         });
@@ -151,10 +174,7 @@ async function handleAsyncGeneration(body, apiPath) {
         let statusData;
         try {
             statusData = JSON.parse(checkText);
-        } catch (e) {
-            console.warn("轮询收到非JSON响应，跳过...");
-            continue;
-        }
+        } catch (e) { continue; }
         
         if (statusData.status === 'completed' || statusData.status === 'succeeded') {
             return statusData.video_url || statusData.url || (statusData.images && statusData.images[0]?.url);
@@ -166,7 +186,7 @@ async function handleAsyncGeneration(body, apiPath) {
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口
+// 🟢 5. 统一调度接口
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -212,7 +232,7 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🟠 5. 同步引擎
+// 🟠 6. 同步引擎
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
     const baseUrl = "https://api.tu-zi.com"; 
@@ -249,7 +269,6 @@ async function handleSyncGeneration(body, apiPath, userId) {
         const item = data.data[0];
         if (item.url) return item.url;
         if (item.b64_json && supabase) {
-            console.log("⚠️ 转存 Base64...");
             const buffer = Buffer.from(item.b64_json, 'base64');
             const fileName = `temp/${userId}/sync_${Date.now()}.png`;
             const { error } = await supabase.storage.from('ai-images').upload(fileName, buffer, { contentType: 'image/png' });
@@ -268,20 +287,20 @@ app.listen(port, () => console.log(`✅ 服务器已启动 (Port ${port})`));
 // 自动清理任务
 cron.schedule('0 0 * * *', async () => {
     if (!supabase) return;
-    const BUCKET_NAME = 'ai-images'; 
-    const ROOT_FOLDER = 'temp';
     try {
+        const BUCKET_NAME = 'ai-images'; 
+        const ROOT_FOLDER = 'temp';
         const { data: folders } = await supabase.storage.from(BUCKET_NAME).list(ROOT_FOLDER);
-        if (!folders) return;
-        for (const folder of folders) {
-            if (folder.name === '.emptyFolderPlaceholder') continue;
-            const path = `${ROOT_FOLDER}/${folder.name}`;
-            const { data: files } = await supabase.storage.from(BUCKET_NAME).list(path);
-            if (files?.length) {
-                await supabase.storage.from(BUCKET_NAME).remove(files.map(f => `${path}/${f.name}`));
+        if (folders) {
+            for (const folder of folders) {
+                if (folder.name === '.emptyFolderPlaceholder') continue;
+                const path = `${ROOT_FOLDER}/${folder.name}`;
+                const { data: files } = await supabase.storage.from(BUCKET_NAME).list(path);
+                if (files?.length) {
+                    await supabase.storage.from(BUCKET_NAME).remove(files.map(f => `${path}/${f.name}`));
+                }
             }
         }
-        console.log('✅ 每日清理完成');
     } catch (err) {
         console.error('清理错误:', err.message);
     }
