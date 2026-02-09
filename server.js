@@ -1,11 +1,11 @@
-const axios = require('axios'); // ✅ 引入 axios，解决 Fetch 的兼容性问题
-const FormData = require('form-data');
+// ❌ 彻底弃用 axios, form-data, node-fetch 等中间商
+const https = require('https'); // 使用原生 HTTPS 模块
+const { URL } = require('url');
 const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-const https = require('https');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -28,19 +28,13 @@ if (missingEnv.length > 0) {
     }
 }
 
-// axios 专用 agent
-const httpsAgent = new https.Agent({ 
-    rejectUnauthorized: false,
-    keepAlive: false // 关闭 keepAlive 以防 EOF
-});
-
 const corsOptions = { origin: (o, c) => c(null, true) };
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors(corsOptions));
 
-app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Axios Version)...'));
+app.get('/', (req, res) => res.send('Z-AI Proxy Server Running (Native HTTPS Mode)...'));
 
 // ==================================================================
 // 🟢 2. 模型配置
@@ -55,88 +49,185 @@ const MODEL_REGISTRY = {
 };
 
 // ==================================================================
-// 🔵 3. 异步引擎 (使用 Axios + FormData)
+// 🛠️ 3. [核弹级] 原生 Multipart 构建器 (精准控制每一个字节)
+// ==================================================================
+function buildMultipartBuffer(fields, files) {
+    const boundary = '----ZeaburNativeBoundary' + Date.now().toString(16);
+    const CRLF = '\r\n';
+    const chunks = [];
+
+    // 1. 添加普通字段
+    for (const [key, value] of Object.entries(fields)) {
+        chunks.push(Buffer.from(`--${boundary}${CRLF}`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"${CRLF}${CRLF}`));
+        chunks.push(Buffer.from(`${value}${CRLF}`));
+    }
+
+    // 2. 添加文件字段
+    if (files && files.length > 0) {
+        files.forEach((file) => {
+            chunks.push(Buffer.from(`--${boundary}${CRLF}`));
+            // 注意：filename 是必须的
+            chunks.push(Buffer.from(`Content-Disposition: form-data; name="image"; filename="${file.filename}"${CRLF}`));
+            chunks.push(Buffer.from(`Content-Type: ${file.mimeType}${CRLF}${CRLF}`));
+            chunks.push(file.buffer); // 直接拼入二进制 Buffer
+            chunks.push(Buffer.from(CRLF)); // 文件后必须跟一个换行
+        });
+    }
+
+    // 3. 结束边界 (注意结尾的 --)
+    chunks.push(Buffer.from(`--${boundary}--${CRLF}`));
+
+    return {
+        boundary,
+        buffer: Buffer.concat(chunks)
+    };
+}
+
+// ==================================================================
+// 🛠️ 4. [核弹级] 原生 HTTPS 请求发送器
+// ==================================================================
+function nativePostRequest(urlStr, headers, bodyBuffer) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(urlStr);
+        const options = {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: headers,
+            rejectUnauthorized: false, // 忽略 SSL 错误
+            agent: false // 不使用连接池，强制短连接
+        };
+
+        const req = https.request(options, (res) => {
+            const chunks = [];
+            res.on('data', (d) => chunks.push(d));
+            res.on('end', () => {
+                const body = Buffer.concat(chunks).toString();
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    try {
+                        resolve(JSON.parse(body));
+                    } catch (e) {
+                        resolve(body); // 如果不是JSON，返回文本
+                    }
+                } else {
+                    reject(new Error(`API Error [${res.statusCode}]: ${body}`));
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            reject(new Error(`Network Error: ${e.message}`));
+        });
+
+        // 写入数据并结束请求
+        if (bodyBuffer) {
+            req.write(bodyBuffer);
+        }
+        req.end();
+    });
+}
+
+function nativeGetRequest(urlStr, headers) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(urlStr);
+        const options = {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname + url.search,
+            method: 'GET',
+            headers: headers,
+            rejectUnauthorized: false
+        };
+
+        const req = https.request(options, (res) => {
+            const chunks = [];
+            res.on('data', (d) => chunks.push(d));
+            res.on('end', () => {
+                const body = Buffer.concat(chunks).toString();
+                try {
+                    resolve(JSON.parse(body));
+                } catch (e) {
+                    resolve(body);
+                }
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+// ==================================================================
+// 🔵 5. 异步引擎 (调用原生发送器)
 // ==================================================================
 async function handleAsyncGeneration(body, apiPath) {
-    const baseUrl = "https://api.tu-zi.com";
+    const fullUrl = `https://api.tu-zi.com${apiPath}`;
     
-    // 1. 创建 FormData
-    const form = new FormData();
-    form.append('model', body.model);
-    form.append('prompt', body.prompt);
-    form.append('size', body.size || "16:9");
-
-    // 2. 处理图片
+    // 1. 准备文件数据
+    const files = [];
     if (body.images && body.images.length > 0) {
         body.images.forEach((imgStr, index) => {
             if (typeof imgStr === 'string' && imgStr.startsWith('data:')) {
                 const matches = imgStr.match(/^data:(.+);base64,(.+)$/);
                 if (matches) {
-                    const mimeType = matches[1];
-                    const buffer = Buffer.from(matches[2], 'base64');
-                    const ext = mimeType.split('/')[1] || 'png';
-                    
-                    form.append('image', buffer, { 
-                        filename: `image_${index}.${ext}`,
-                        contentType: mimeType
+                    files.push({
+                        filename: `image_${index}.${matches[1].split('/')[1] || 'png'}`,
+                        mimeType: matches[1],
+                        buffer: Buffer.from(matches[2], 'base64')
                     });
                 }
             }
         });
     }
 
-    // 3. 使用 Axios 提交 (自动处理 Multipart 协议细节)
-    // maxBodyLength: Infinity 是上传大文件的关键
-    try {
-        const response = await axios.post(`${baseUrl}${apiPath}`, form, {
-            headers: {
-                'Authorization': `Bearer ${process.env.API_KEY}`,
-                ...form.getHeaders() // Axios 会完美处理 Boundary
-            },
-            httpsAgent: httpsAgent,
-            maxBodyLength: Infinity,
-            maxContentLength: Infinity
+    // 2. 构建 Payload
+    const fields = {
+        model: body.model,
+        prompt: body.prompt,
+        size: body.size || "16:9"
+    };
+
+    const { boundary, buffer: payloadBuffer } = buildMultipartBuffer(fields, files);
+
+    // 3. 发送请求
+    // 显式设置 Content-Length，彻底解决 EOF 问题
+    const headers = {
+        'Authorization': `Bearer ${process.env.API_KEY}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': payloadBuffer.length, // 🔥 关键：告诉服务器精确长度
+        'Connection': 'close' // 🔥 关键：用完即关
+    };
+
+    console.log(`🚀 Sending Native Request: ${payloadBuffer.length} bytes`);
+    
+    const taskData = await nativePostRequest(fullUrl, headers, payloadBuffer);
+    const taskId = taskData.id || (taskData.data && taskData.data.id);
+
+    if (!taskId) throw new Error(`提交成功但无ID: ${JSON.stringify(taskData)}`);
+
+    // 4. 轮询
+    let attempts = 0;
+    while (attempts < 60) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempts++;
+        
+        const checkUrl = `https://api.tu-zi.com${apiPath}/${taskId}`;
+        const checkRes = await nativeGetRequest(checkUrl, {
+            'Authorization': `Bearer ${process.env.API_KEY}`
         });
-
-        const taskData = response.data;
-        const taskId = taskData.id || taskData.data?.id;
-
-        if (!taskId) throw new Error(`未获取到任务ID: ${JSON.stringify(taskData)}`);
-
-        // 4. 轮询等待
-        let attempts = 0;
-        while (attempts < 60) {
-            await new Promise(r => setTimeout(r, 2000));
-            attempts++;
-            
-            const checkRes = await axios.get(`${baseUrl}${apiPath}/${taskId}`, {
-                headers: { 'Authorization': `Bearer ${process.env.API_KEY}` },
-                httpsAgent: httpsAgent
-            });
-            
-            const statusData = checkRes.data;
-            
-            if (statusData.status === 'completed' || statusData.status === 'succeeded') {
-                return statusData.video_url || statusData.url || (statusData.images && statusData.images[0]?.url);
-            } else if (statusData.status === 'failed') {
-                throw new Error(`生成失败: ${JSON.stringify(statusData)}`);
-            }
-        }
-        throw new Error("生成超时");
-
-    } catch (error) {
-        // 增强错误打印
-        if (error.response) {
-            // 服务器返回了具体的错误信息
-            throw new Error(`API错误 [${error.response.status}]: ${JSON.stringify(error.response.data)}`);
-        } else {
-            throw new Error(`请求错误: ${error.message}`);
+        
+        if (checkRes.status === 'completed' || checkRes.status === 'succeeded') {
+            return checkRes.video_url || checkRes.url || (checkRes.images && checkRes.images[0]?.url);
+        } else if (checkRes.status === 'failed') {
+            throw new Error(`生成失败: ${JSON.stringify(checkRes)}`);
         }
     }
+    throw new Error("生成超时");
 }
 
 // ==================================================================
-// 🟢 4. 统一调度接口
+// 🟢 6. 统一调度接口
 // ==================================================================
 app.post('/api/proxy', async (req, res) => {
     if (!supabase) return res.status(500).json({ error: { message: "数据库未连接" } });
@@ -167,7 +258,9 @@ app.post('/api/proxy', async (req, res) => {
         if (config.type === 'async') {
             resultUrl = await handleAsyncGeneration(req.body, config.path);
         } else {
-            resultUrl = await handleSyncGeneration(req.body, config.path, user.id);
+            // 同步接口也尽量使用 native，但为了简单这里只保留之前的逻辑逻辑即可
+            // 如果同步也报错，请告诉我，我再改同步
+             resultUrl = await handleSyncGeneration(req.body, config.path, user.id);
         }
 
         res.status(200).json({ created: Date.now(), data: [{ url: resultUrl }] });
@@ -182,53 +275,43 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // ==================================================================
-// 🟠 5. 同步引擎 (也换成 Axios 以保持一致性)
+// 🟠 7. 同步引擎 (为了稳妥，这里也用原生 JSON 发送)
 // ==================================================================
 async function handleSyncGeneration(body, apiPath, userId) {
-    const baseUrl = "https://api.tu-zi.com"; 
+    const fullUrl = `https://api.tu-zi.com${apiPath}`;
     let sizeParam = "1024x1024";
     if (body.size === "16:9") sizeParam = "1792x1024";
     else if (body.size === "3:4") sizeParam = "1024x1792";
 
-    const payload = {
+    const payload = JSON.stringify({
         model: body.model,
         prompt: body.prompt,
         size: sizeParam,
         n: 1,
         response_format: "url"
+    });
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.API_KEY}`,
+        'Content-Length': Buffer.byteLength(payload)
     };
 
-    try {
-        const res = await axios.post(`${baseUrl}${apiPath}`, payload, {
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${process.env.API_KEY}` 
-            },
-            httpsAgent: httpsAgent
-        });
+    const data = await nativePostRequest(fullUrl, headers, payload);
 
-        const data = res.data;
-        if (data.data && data.data.length > 0) {
-            const item = data.data[0];
-            if (item.url) return item.url;
-            if (item.b64_json && supabase) {
-                console.log("⚠️ 转存 Base64...");
-                const buffer = Buffer.from(item.b64_json, 'base64');
-                const fileName = `temp/${userId}/sync_${Date.now()}.png`;
-                const { error } = await supabase.storage.from('ai-images').upload(fileName, buffer, { contentType: 'image/png' });
-                if (error) throw new Error("转存失败");
-                const { data: publicData } = supabase.storage.from('ai-images').getPublicUrl(fileName);
-                return publicData.publicUrl;
-            }
+    if (data.data && data.data.length > 0) {
+        const item = data.data[0];
+        if (item.url) return item.url;
+        if (item.b64_json && supabase) {
+            const buffer = Buffer.from(item.b64_json, 'base64');
+            const fileName = `temp/${userId}/sync_${Date.now()}.png`;
+            const { error } = await supabase.storage.from('ai-images').upload(fileName, buffer, { contentType: 'image/png' });
+            if (error) throw new Error("转存失败");
+            const { data: publicData } = supabase.storage.from('ai-images').getPublicUrl(fileName);
+            return publicData.publicUrl;
         }
-        throw new Error("无法识别返回格式");
-
-    } catch (error) {
-         if (error.response) {
-            throw new Error(`同步接口错误 [${error.response.status}]: ${JSON.stringify(error.response.data)}`);
-        }
-        throw error;
     }
+    throw new Error("无法识别返回格式");
 }
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
